@@ -5,7 +5,7 @@
   "main": "dist/main.js",
   "private": true,
   "author": "Flap Happy",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "scripts": {
     "build": "node build/build.mjs",
     "typecheck": "tsc --noEmit",
