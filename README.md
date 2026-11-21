@@ -1,8 +1,8 @@
 # Flap Happy
 
-A small always-on-top window for MSFS 2024 gliders. It shows the current indicated airspeed (IAS) on a segmented bar, where each segment is one flap setting's speed range, plus the current flap position, so you can see at a glance which flap you should be in. A ballast slider shifts the speeds for water ballast.
+A compact window for MSFS 2024 gliders, and the same display inside the sim, including VR. It shows the current indicated airspeed (IAS) on a segmented bar, where each segment is one flap setting's speed range, plus the current flap position, so you can see at a glance which flap you should be in. A ballast slider shifts the speeds for water ballast. Press **PIN** to keep the desktop window above other programs.
 
-This is **Phase 1**: a Windows desktop app (Electron + `node-simconnect`, plain HTML/JS/CSS). The display code is written in a conservative subset so the same UI can later move into an in-sim toolbar panel (Coherent GT) in Phase 2.
+The desktop app is Electron with `node-simconnect`. It owns the sim connection and serves the cockpit panel. The display is plain HTML/JS/CSS in a conservative subset so the sim's browser can run it.
 
 Spec: `docs/flap-display-proposal.md` (rev 12). Mockup: `media/ui-mockup.png`. Screenshots of this build: `media/flaphappy-*.png`.
 
@@ -17,7 +17,7 @@ You need either the portable exe or a folder with these files plus Node.js.
 2. Double-click **`Start Flap Happy.bat`**. The first run downloads the components (a few minutes), then the window opens.
 3. No simulator handy? Double-click **`Start Flap Happy (demo, no sim).bat`**. It runs on fake data with a control panel so you can try everything.
 
-With MSFS 2024: start the sim first or after, either works. Flap Happy reconnects by itself (it says "Waiting for MSFS..."). SimConnect needs no configuration or extra files; it connects over the sim's local connection.
+With MSFS 2024: start the sim first or after, either works. Flap Happy reconnects by itself. The desktop window is compact, so the "Waiting for MSFS..." status line is hidden; the bar fills in once the sim is sending data. SimConnect needs no configuration or extra files; it connects over the sim's local connection.
 
 ### First use
 1. Click the cog (top right) to open the settings.
@@ -84,7 +84,7 @@ build/      esbuild build, harness server, Coherent-safe lint
 tests/      unit (core + adapters) and ui (Playwright)
 ```
 
-The UI only talks to the three adapter interfaces, so Phase 2 replaces the Electron adapters with in-sim ones and reuses `core/` and `ui/` unchanged.
+The desktop UI talks to three adapter interfaces (data, profiles, and host). The cockpit panel is a second view of that same display: the desktop app keeps SimConnect and serves the panel on localhost.
 
 Coherent-safe rules, enforced by `npm run lint:coherent` and by compiling the renderer to ES2015 and checking it with es-check: flexbox and absolute positioning only (no grid, `gap`, CSS variables), no `ResizeObserver`, `localStorage`, `fetch`, clipboard, pointer events, `Object.entries`, `padStart`; mouse and touch events only.
 
@@ -102,13 +102,13 @@ A profile has N flap rows (any N from 0 up; each row: label, a sim index you typ
 
 ## Tests
 - `npm test`: 97 unit tests (profile model, validation, ballast and scale math, flap resolver, display model, file store, simulated source, scenarios incl. a 20-minute soak, replay, CLI parsing).
-- `npm run test:ui`: 30 tests in a real browser (display for N = 0/1/2/6/10, states, fallbacks, ballast slider, editor, import errors, dev panel, compact) and in a real Electron window under simulated and replay sources (real files, restart persistence, compact swap, recording).
+- `npm run test:ui`: 30 tests in a real browser (display for N = 0/1/2/6/10, states, fallbacks, ballast slider, editor, import errors, dev panel, compact) and in a real Electron window under simulated and replay sources (real files, restart persistence, compact window with no MINI/FULL button, recording).
 
 ## Only verifiable on Windows with MSFS 2024
 Everything above runs and is tested without the sim. These need a real Windows machine and MSFS:
 1. `node-simconnect` connects to MSFS 2024 with the `SunRise` protocol and no extra DLL/config; reconnects after the sim is closed and restarted.
 2. The data definition really returns what the code expects for the AS 33 Me: flap handle index and count, flap percent, aircraft `TITLE` (used for auto-selecting a profile), and the optional `L:` variable (set in Advanced).
-3. Which handle indices the AS 33 Me actually reports, so the profile rows can be filled correctly; the Capture buttons are meant for exactly this.
+3. Which handle indices the AS 33 Me actually reports. The editor shows the live handle index so each profile row can be matched to the lever.
 4. Sample rate and behaviour on pause, menus, loading and slew (the "Paused" / "No data" states).
 5. Always-on-top over MSFS in windowed, borderless and true fullscreen modes (the app uses the highest topmost level; exclusive fullscreen may still hide it).
 6. Packaging: the portable exe starts, SmartScreen behaviour, `%APPDATA%\FlapHappy` creation, file open/save dialogs, "Open profiles folder".
