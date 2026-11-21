@@ -1,0 +1,16 @@
+{
+  "name": "Combined 60 s loop (use for the 20 minute soak)",
+  "description": "IAS sweep, lever steps, a fault and a disconnect in one 60 s loop; run it for 20 minutes to soak.",
+  "loop": true,
+  "duration": 60,
+  "keyframes": [
+    { "t": 0, "iasRel": { "from": "vs", "offsetKt": -5 }, "flapRow": 0, "ballast": 0, "connected": true, "fault": "none" },
+    { "t": 15, "iasRel": { "from": "vne", "offsetKt": 5 }, "flapRow": 5, "ballast": 1 },
+    { "t": 30, "iasRel": { "from": "vs", "frac": 0.5 }, "flapRow": 2, "ballast": 0.5 },
+    { "t": 40, "fault": "percent-only" },
+    { "t": 45, "fault": "none" },
+    { "t": 50, "connected": false },
+    { "t": 53, "connected": true },
+    { "t": 60, "iasRel": { "from": "vs", "offsetKt": -5 } }
+  ]
+}

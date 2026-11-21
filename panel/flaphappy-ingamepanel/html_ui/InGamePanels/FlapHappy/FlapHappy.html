@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="/SCSS/common.css" />
+    <link rel="stylesheet" href="FlapHappy.css" />
+    <script type="text/javascript" src="/JS/coherent.js"></script>
+    <script type="text/javascript" src="/JS/common.js"></script>
+    <script type="text/javascript" src="/JS/dataStorage.js"></script>
+    <script type="text/javascript" src="/JS/Services/ToolBarPanels.js"></script>
+    <script type="text/javascript" src="/Pages/VCockpit/Instruments/Shared/BaseInstrument.js"></script>
+    <link rel="import" href="/templates/ingameUi/ingameUi.html" />
+    <link rel="import" href="/templates/ingameUiHeader/ingameUiHeader.html" />
+    <script type="text/javascript" src="FlapHappy.js"></script>
+</head>
+<body class="border-box">
+    <flaphappy-ingamepanel>
+        <ingame-ui id="FlapHappyPanel" panel-id="FLAPHAPPY_PANEL" title="" class="ingameUiFrame" content-fit="true" min-width="160" min-height="10">
+            <div id="FlapHappyWrap">
+                <div id="FlapHappyNote">Start Flap Happy on the desktop.</div>
+                <iframe id="FlapHappyFrame" src="http://127.0.0.1:47321/panel.html"></iframe>
+            </div>
+        </ingame-ui>
+    </flaphappy-ingamepanel>
+</body>
+</html>

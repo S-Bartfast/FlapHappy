@@ -1,0 +1,10 @@
+{
+  "name": "Ballast slider sweep",
+  "description": "Ballast moves None to Max and back while IAS and lever hold still: ticks re-align live.",
+  "loop": true,
+  "keyframes": [
+    { "t": 0, "iasRel": { "from": "vs", "frac": 0.5 }, "flapRow": 2, "ballast": 0 },
+    { "t": 15, "ballast": 1 },
+    { "t": 30, "ballast": 0 }
+  ]
+}

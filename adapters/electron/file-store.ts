@@ -1,0 +1,114 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import type { ProfileStore, SaveOptions } from '../../core/sim';
+import type { Profile, ProfileMeta, Settings } from '../../core/types';
+import { exportProfileJson, normalizeProfile, sanitizeId } from '../../core/profile';
+import { defaultSettings, normalizeSettings } from '../../core/settings';
+import { validateProfile } from '../../core/validate';
+
+/** Write to a temp file, keep one `.bak` of the previous version, then rename over the target. */
+export function atomicWrite(file: string, text: string): void {
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, text, 'utf8');
+  if (fs.existsSync(file)) {
+    try {
+      fs.copyFileSync(file, file + '.bak');
+    } catch {
+      // A failed backup must not block saving.
+    }
+  }
+  fs.renameSync(tmp, file);
+}
+
+/**
+ * Profile library: one `<id>.json` per profile in `<root>/profiles`, plus `<root>/settings.json`.
+ * Plain JSON, human-editable and copyable between machines. No Electron dependency, so it is unit-tested.
+ */
+export class FileProfileStore implements ProfileStore {
+  readonly profilesDir: string;
+  readonly settingsFile: string;
+  private settings: Settings | null = null;
+
+  constructor(public readonly root: string) {
+    this.profilesDir = path.join(root, 'profiles');
+    this.settingsFile = path.join(root, 'settings.json');
+    fs.mkdirSync(this.profilesDir, { recursive: true });
+  }
+
+  private fileFor(id: string): string {
+    const safe = sanitizeId(id);
+    if (!safe) throw new Error('Invalid profile id');
+    return path.join(this.profilesDir, safe + '.json');
+  }
+
+  async list(): Promise<ProfileMeta[]> {
+    const out: ProfileMeta[] = [];
+    for (const name of fs.readdirSync(this.profilesDir)) {
+      if (!name.endsWith('.json')) continue;
+      const id = name.slice(0, -5);
+      try {
+        const parsed = normalizeProfile(JSON.parse(fs.readFileSync(path.join(this.profilesDir, name), 'utf8')));
+        if (!parsed.profile) throw new Error(parsed.errors.join('; '));
+        const p = parsed.profile;
+        out.push({
+          id,
+          filename: name,
+          incomplete: !validateProfile(p).ok,
+          match: p.match.title_contains.slice(),
+          source: p.source,
+        });
+      } catch (e) {
+        out.push({ id, filename: name, incomplete: true, match: [], source: 'user', error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    out.sort((a, b) => a.filename.localeCompare(b.filename));
+    return out;
+  }
+
+  async load(id: string): Promise<Profile> {
+    const text = fs.readFileSync(this.fileFor(id), 'utf8');
+    const r = normalizeProfile(JSON.parse(text));
+    if (!r.profile) throw new Error(r.errors.join('; '));
+    r.profile.id = sanitizeId(id);
+    return r.profile;
+  }
+
+  async save(p: Profile, _opts?: SaveOptions): Promise<void> {
+    atomicWrite(this.fileFor(p.id), exportProfileJson(p));
+  }
+
+  async remove(id: string): Promise<void> {
+    const f = this.fileFor(id);
+    if (fs.existsSync(f)) fs.renameSync(f, f + '.deleted.bak');
+  }
+
+  async getSettings(): Promise<Settings> {
+    if (!this.settings) {
+      try {
+        this.settings = normalizeSettings(JSON.parse(fs.readFileSync(this.settingsFile, 'utf8')));
+      } catch {
+        this.settings = defaultSettings();
+      }
+    }
+    return JSON.parse(JSON.stringify(this.settings)) as Settings;
+  }
+
+  /** Replaces the settings but keeps the main-process-owned window bounds unless the caller sets them. */
+  async setSettings(s: Settings): Promise<void> {
+    const cur = await this.getSettings();
+    const next = normalizeSettings(s);
+    if (next.window === null) next.window = cur.window;
+    this.settings = next;
+    this.flushSettings();
+  }
+
+  setWindowBounds(b: Settings['window']): void {
+    const cur = this.settings ?? normalizeSettings(null);
+    this.settings = { ...cur, window: b };
+    this.flushSettings();
+  }
+
+  private flushSettings(): void {
+    if (this.settings) atomicWrite(this.settingsFile, JSON.stringify(this.settings, null, 2) + '\n');
+  }
+}

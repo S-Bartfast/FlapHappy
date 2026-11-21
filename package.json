@@ -1,0 +1,67 @@
+{
+  "name": "flaphappy",
+  "version": "1.0.0",
+  "description": "Flap Happy: glider flap-speed display for MSFS 2024 (Phase 1: Windows desktop window)",
+  "main": "dist/main.js",
+  "private": true,
+  "author": "Flap Happy",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "node build/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "start": "npm run build && electron . ",
+    "start:demo": "npm run build && electron . --source=simulated",
+    "harness": "npm run build && node build/serve.mjs",
+    "test": "vitest run",
+    "test:ui": "npm run build && vitest run --config vitest.ui.config.ts",
+    "lint:coherent": "node build/lint-coherent.mjs",
+    "check": "npm run typecheck && npm run test && npm run build && npm run lint:coherent",
+    "dist:win": "npm run build && electron-builder --win portable nsis --x64",
+    "dist:portable": "npm run build && electron-builder --win portable --x64 --config.directories.output=../FlapHappy-pack && node build/copy-portable.mjs"
+  },
+  "dependencies": {
+    "node-simconnect": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "^45.3.4",
+    "electron-builder": "^26.18.0",
+    "es-check": "^9.9.0",
+    "esbuild": "^0.25.0",
+    "playwright-core": "^1.50.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "build": {
+    "appId": "app.flaphappy",
+    "productName": "Flap Happy",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "artifactName": "FlapHappy-${version}-${target}.${ext}"
+    },
+    "portable": {
+      "artifactName": "FlapHappy-${version}-portable.exe"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    }
+  }
+}

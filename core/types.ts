@@ -1,0 +1,108 @@
+export const PROFILE_SCHEMA = 'flaphappy.profile/3';
+export const SETTINGS_SCHEMA = 'flaphappy.settings/1';
+
+export interface Speed {
+  no_ballast_kt: number | null;
+  max_ballast_kt: number | null;
+}
+
+export interface FlapPosition {
+  label: string;
+  handle_index: number | null;
+  vfe_kt?: number | null;
+}
+
+export type CurrentFlapSource = 'index' | 'percent' | 'lvar';
+
+export interface BallastConfig {
+  source: 'manual';
+  default_fraction: number;
+  drag_snap: number;
+  max_ballast_litres: number | null;
+  dump_minutes: number;
+  auto: { enabled: boolean; [k: string]: unknown };
+}
+
+export interface CurrentFlapConfig {
+  source: CurrentFlapSource;
+  lvar_name: string | null;
+  manual_fallback: boolean;
+}
+
+export interface Profile {
+  schema: typeof PROFILE_SCHEMA;
+  /** Filename stem in the profile folder. The title is this plus `.json`. */
+  id: string;
+  match: { title_contains: string[] };
+  /** Working speeds in this object are knots. Saved files use metres per second. */
+  units: 'kt';
+  flaps: FlapPosition[];
+  handle_count: number | null;
+  vs_min: Speed;
+  transitions: Speed[];
+  /** Knots. Saved files store this as a single `vne_ms`, with no ballast split. */
+  vne: number | null;
+  ballast: BallastConfig;
+  current_flap: CurrentFlapConfig;
+  marker_smoothing_ms: number;
+  bank_scaling: 'off';
+  display: { vfe_overlay: boolean };
+  source: 'user' | 'preset';
+  notes: string;
+}
+
+export type IssueLevel = 'error' | 'warning';
+export type IssueCategory = 'structure' | 'speeds' | 'other';
+
+export interface Issue {
+  level: IssueLevel;
+  category: IssueCategory;
+  code: string;
+  message: string;
+  /** Dotted field path for per-field highlighting, e.g. `transitions[2].no_ballast_kt`. */
+  path?: string;
+}
+
+export interface ValidationResult {
+  errors: Issue[];
+  warnings: Issue[];
+  issues: Issue[];
+  /** No errors at all: the profile may be applied to the live display. */
+  ok: boolean;
+  /** Rows and handle indices are usable, so the current-flap indication can work. */
+  structureOk: boolean;
+}
+
+export interface ProfileMeta {
+  id: string;
+  /** File name in the profile folder, including `.json`. */
+  filename: string;
+  incomplete: boolean;
+  match: string[];
+  source: 'user' | 'preset';
+  error?: string;
+}
+
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface Settings {
+  schema: typeof SETTINGS_SCHEMA;
+  last_profile_id: string | null;
+  active_by_title: Record<string, string>;
+  ballast_by_profile: Record<string, number>;
+  /** How speeds are shown. Profile files are stored in metres per second. */
+  units: 'kt' | 'kmh';
+  ui: {
+    compact: boolean;
+    always_on_top: boolean;
+    opacity: number;
+    zoom: number;
+    demo_mode: boolean;
+  };
+  window: WindowBounds | null;
+}

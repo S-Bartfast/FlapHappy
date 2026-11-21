@@ -1,0 +1,16 @@
+{
+  "name": "Connect / disconnect cycle",
+  "description": "Connected, sim quits (waiting), reconnects, pauses, resumes.",
+  "loop": true,
+  "keyframes": [
+    { "t": 0, "connected": true, "inFlight": true, "iasRel": { "from": "vs", "frac": 0.4 }, "flapRow": 1 },
+    { "t": 8, "connected": false },
+    { "t": 14, "connected": true },
+    { "t": 20, "inFlight": false },
+    { "t": 25, "inFlight": true },
+    { "t": 30, "onGround": true, "iasRel": { "from": "vs", "offsetKt": -40 } },
+    { "t": 35, "onGround": false, "iasRel": { "from": "vs", "frac": 0.4 } },
+    { "t": 40, "fault": "stale" },
+    { "t": 45, "fault": "none" }
+  ]
+}

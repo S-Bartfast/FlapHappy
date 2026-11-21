@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<SimBase.Document Type="InGamePanels" version="1,0">
+  <Filename>FlapHappy.spb</Filename>
+  <InGamePanels.InGamePanelDefinition
+    id="FLAPHAPPY_PANEL"
+    Name="Flap Happy"
+    url="html_ui/InGamePanels/FlapHappy/FlapHappy.html"
+    icon="ICON_TOOLBAR_FLAPHAPPY"
+    resizeDirections="Both"
+    minWidth="40"
+    minHeight="4"
+    defaultWidth="80"
+    defaultHeight="28"
+    defaultTop="8"
+    defaultRight="8"
+    buttonVisible="true">
+  </InGamePanels.InGamePanelDefinition>
+</SimBase.Document>

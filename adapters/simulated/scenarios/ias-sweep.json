@@ -1,0 +1,10 @@
+{
+  "name": "IAS sweep (all transitions, both ends)",
+  "description": "IAS ramps from below the stall end, across every transition, past Vne and back. Profile-relative.",
+  "loop": true,
+  "keyframes": [
+    { "t": 0, "iasRel": { "from": "vs", "offsetKt": -12 }, "onGround": false },
+    { "t": 40, "iasRel": { "from": "vne", "offsetKt": 12 } },
+    { "t": 80, "iasRel": { "from": "vs", "offsetKt": -12 } }
+  ]
+}

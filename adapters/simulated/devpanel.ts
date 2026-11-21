@@ -1,0 +1,109 @@
+import { h, setText } from '../../ui/dom';
+import type { App } from '../../ui/app';
+import { FAULTS, type Fault } from './simulated-source';
+import { ScenarioPlayer, type Scenario } from './scenario';
+import iasSweep from './scenarios/ias-sweep.json';
+import lever from './scenarios/lever-sequence.json';
+import ballastSweep from './scenarios/ballast-sweep.json';
+import connect from './scenarios/connect-cycle.json';
+import faults from './scenarios/faults-tour.json';
+import soak from './scenarios/combined-soak.json';
+
+export const SCENARIOS: Scenario[] = [iasSweep, lever, ballastSweep, connect, faults, soak] as unknown as Scenario[];
+
+/**
+ * Dev-only control panel for the simulated source (hidden in normal use; shown with --source=simulated,
+ * --dev, or on the browser harness page). Everything here drives `SimulatedSource.controls`.
+ */
+export function mountDevPanel(container: HTMLElement, app: App): void {
+  const sim = app.sim;
+  const c = sim.controls;
+  const readouts: Record<string, HTMLElement> = {};
+  const row = (...kids: Array<HTMLElement | null>) => h('div', { class: 'fh-devrow' }, ...kids);
+  const lab = (t: string) => h('label', { class: 'fh-devlab' }, t);
+
+  const iasRange = h('input', { type: 'range', min: '0', max: '220', step: '0.5', value: String(c.iasKt), class: 'fh-dev-ias', 'aria-label': 'Simulated IAS', oninput: (e: Event) => setIas(Number((e.target as HTMLInputElement).value)) }) as HTMLInputElement;
+  const iasNum = h('input', { type: 'number', step: '0.5', value: String(c.iasKt), class: 'fh-in fh-dev-iasnum', 'aria-label': 'Simulated IAS number', oninput: (e: Event) => setIas(Number((e.target as HTMLInputElement).value)) }) as HTMLInputElement;
+  function setIas(v: number): void {
+    if (!isFinite(v)) return;
+    c.iasKt = v;
+    iasRange.value = String(v);
+    if (document.activeElement !== iasNum) iasNum.value = String(v);
+    sim.tick(0);
+  }
+
+  const flapSel = h('select', { class: 'fh-select fh-dev-flap', 'aria-label': 'Simulated flap handle index', onchange: (e: Event) => { c.flapIndex = Number((e.target as HTMLSelectElement).value); sim.tick(0); } }) as HTMLSelectElement;
+  const count = h('input', { type: 'number', min: '0', max: '16', value: String(c.flapCount), class: 'fh-in fh-dev-count', 'aria-label': 'Simulated flap count', oninput: (e: Event) => { c.flapCount = Math.max(0, Math.round(Number((e.target as HTMLInputElement).value) || 0)); fillFlaps(); sim.tick(0); } }) as HTMLInputElement;
+  function fillFlaps(): void {
+    while (flapSel.firstChild) flapSel.removeChild(flapSel.firstChild);
+    const n = Math.max(c.flapCount, c.flapIndex + 1, 1);
+    for (let i = 0; i < n; i++) {
+      const o = h('option', { value: String(i) }, String(i)) as HTMLOptionElement;
+      o.selected = i === c.flapIndex;
+      flapSel.appendChild(o);
+    }
+  }
+  fillFlaps();
+
+  const toggle = (label: string, key: 'connected' | 'inFlight' | 'onGround', cls: string) =>
+    h('label', { class: 'fh-check' }, h('input', { type: 'checkbox', class: cls, checked: c[key], onchange: (e: Event) => { c[key] = (e.target as HTMLInputElement).checked; sim.tick(0); } }), ' ' + label);
+
+  const faultBtns = FAULTS.map((f: Fault) => h('button', { class: 'fh-btn fh-fault', type: 'button', 'data-fault': f, onclick: () => { c.fault = f; setText(readouts.fault, 'fault: ' + f); sim.tick(0); } }, f));
+  readouts.fault = h('span', { class: 'fh-devstate' }, 'fault: none');
+
+  const title = h('input', { type: 'text', class: 'fh-in fh-dev-title', value: c.title, 'aria-label': 'Simulated aircraft title', oninput: (e: Event) => { c.title = (e.target as HTMLInputElement).value; } });
+
+  // Scenario runner (fixed 100 ms steps, driven by wall clock).
+  let player: ScenarioPlayer | null = null;
+  let startedAt = 0;
+  let timer: ReturnType<typeof setInterval> | null = null;
+  const scenSel = h('select', { class: 'fh-select fh-dev-scen', 'aria-label': 'Scenario' }, ...SCENARIOS.map((s, i) => h('option', { value: String(i) }, s.name))) as HTMLSelectElement;
+  const scenState = h('span', { class: 'fh-devstate' }, 'idle');
+  const stop = () => {
+    if (timer) clearInterval(timer);
+    timer = null;
+    player = null;
+    setText(scenState, 'idle');
+  };
+  const play = () => {
+    stop();
+    const sc = SCENARIOS[Number(scenSel.value)];
+    const b = app.currentBoundaries();
+    const p = app.profile;
+    player = new ScenarioPlayer(sc, {
+      vs: b ? b[0] : null,
+      vne: b ? b[b.length - 1] : null,
+      rowHandles: p ? p.flaps.map((r) => r.handle_index ?? 0) : [],
+    });
+    startedAt = Date.now();
+    setText(scenState, 'running: ' + sc.name);
+    timer = setInterval(() => {
+      if (!player) return;
+      const b2 = app.currentBoundaries();
+      player.ctx.vs = b2 ? b2[0] : player.ctx.vs;
+      player.ctx.vne = b2 ? b2[b2.length - 1] : player.ctx.vne;
+      const out = player.at((Date.now() - startedAt) / 1000);
+      if (out.connected !== undefined) c.connected = out.connected;
+      if (out.inFlight !== undefined) c.inFlight = out.inFlight;
+      if (out.onGround !== undefined) c.onGround = out.onGround;
+      if (out.iasKt !== undefined) setIas(out.iasKt);
+      if (out.flapIndex !== undefined) c.flapIndex = out.flapIndex;
+      if (out.fault !== undefined) c.fault = out.fault;
+      if (out.ballast !== undefined) app.setBallast(out.ballast, true);
+      if (flapSel.value !== String(c.flapIndex)) fillFlaps();
+    }, 100);
+  };
+
+  const ballastSweepBtn = h('button', { class: 'fh-btn', type: 'button', onclick: () => { scenSel.value = '2'; play(); } }, 'Ballast sweep');
+
+  container.appendChild(
+    h('div', { class: 'fh-devpanel' },
+      h('div', { class: 'fh-devtitle' }, 'DEV: simulated source'),
+      row(lab('IAS'), iasRange, iasNum, lab('kt')),
+      row(lab('Flap handle index'), flapSel, lab('count'), count, lab('title'), title),
+      row(toggle('connected', 'connected', 'fh-dev-connected'), toggle('in flight (not paused)', 'inFlight', 'fh-dev-inflight'), toggle('on ground', 'onGround', 'fh-dev-ground')),
+      row(lab('Inject fault'), ...faultBtns, readouts.fault),
+      row(lab('Scenario'), scenSel, h('button', { class: 'fh-btn fh-dev-play', type: 'button', onclick: play }, 'Play'), h('button', { class: 'fh-btn fh-dev-stop', type: 'button', onclick: stop }, 'Stop'), ballastSweepBtn, scenState),
+    ),
+  );
+}

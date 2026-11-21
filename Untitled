@@ -1,0 +1,7 @@
+The exe already contains the cockpit panel, including your toolbar icon. The other person does this:
+
+Double-click the exe. Windows SmartScreen may say it is unrecognized because the file is not signed. More info, then Run anyway.
+In Flap Happy, open settings and choose Install cockpit panel.
+Restart MSFS, then press Tab and open Flap Happy.
+Leave the desktop app running. The panel in the sim shows that window.
+A new install also gets the AS33-18m, AS33-15m, and JS3 profiles. Profiles you have edited under %APPDATA%\FlapHappy\profiles are not inside the exe. To share one of those, send the .json file. They can drag it onto the Flap Happy window.

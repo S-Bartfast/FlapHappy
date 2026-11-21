@@ -1,0 +1,15 @@
+{
+  "name": "Fault tour (current-flap fallback chain)",
+  "description": "Cycles missing index, out-of-range index, percent only, L: var only, unreadable and stale data.",
+  "loop": true,
+  "keyframes": [
+    { "t": 0, "iasRel": { "from": "vs", "frac": 0.5 }, "flapRow": 2, "fault": "none" },
+    { "t": 5, "fault": "index-missing" },
+    { "t": 10, "fault": "index-out-of-range" },
+    { "t": 20, "fault": "percent-only" },
+    { "t": 25, "fault": "lvar-only" },
+    { "t": 30, "fault": "unreadable" },
+    { "t": 35, "fault": "stale" },
+    { "t": 40, "fault": "none" }
+  ]
+}
