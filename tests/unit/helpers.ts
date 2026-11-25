@@ -8,6 +8,7 @@ export function makeProfile(n: number, opts: { id?: string } = {}): Profile {
   for (let i = 0; i < n; i++) {
     p.flaps.push({ label: String(i + 1), handle_index: i, vfe_kt: 200 });
   }
+  p.weight_kg = { light: 400, heavy: 600 };
   p.vs_min = { no_ballast_kt: 40, max_ballast_kt: 50 };
   for (let k = 1; k < n; k++) p.transitions.push({ no_ballast_kt: 40 + 12 * k, max_ballast_kt: 50 + 16 * k });
   const topMax = n >= 1 ? 50 + 16 * n : 120;
@@ -17,5 +18,5 @@ export function makeProfile(n: number, opts: { id?: string } = {}): Profile {
 }
 
 export function sample(over: Partial<SimSample> = {}): SimSample {
-  return { ...emptySample(1000), connected: true, inFlight: true, iasKt: 70, onGround: false, flapIndex: 0, flapCount: 6, flapPercent: 0, aircraftTitle: 'Test glider', ...over };
+  return { ...emptySample(1000), connected: true, inFlight: true, iasKt: 70, totalWeightKg: 400, onGround: false, flapIndex: 0, flapCount: 6, flapPercent: 0, aircraftTitle: 'Test glider', ...over };
 }

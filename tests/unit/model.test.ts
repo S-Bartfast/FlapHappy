@@ -14,7 +14,7 @@ import { SETTINGS_SCHEMA, type Profile, type ProfileMeta } from '../../core/type
 function model(p: Profile | null, s: SimSample | null, f = 0, link = 'live' as 'live' | 'waiting' | 'nodata' | 'paused', ias?: number | null) {
   const v = p ? validateProfile(p) : null;
   const flap = p ? new CurrentFlapResolver().resolve(p, s, 1000) : ({ status: 'unknown', rowIndex: null, label: null, handleIndex: null, via: null } as const);
-  return buildDisplayModel({ profile: p, validation: v, sample: s, link, f, ias: ias ?? null, flap });
+  return buildDisplayModel({ profile: p, validation: v, sample: s ? { ...s, totalWeightKg: 400 + f * 200 } : null, link, ias: ias ?? null, flap });
 }
 
 describe('display model', () => {
@@ -110,6 +110,7 @@ describe('display model', () => {
 
   it('N = 0 is "no flaps" with an unsegmented bar when Vs and Vne are set', () => {
     const p = createBlankProfile();
+    p.weight_kg = { light: 400, heavy: 600 };
     p.vs_min = { no_ballast_kt: 40, max_ballast_kt: 40 };
     p.vne = 120;
     const m = model(p, sample({ iasKt: 80 }));
@@ -144,7 +145,6 @@ describe('display model', () => {
       validation: validateProfile(p),
       sample: sample({ iasKt: 100, flapCount: 2 }),
       link: 'live',
-      f: 0,
       ias: null,
       flap: new CurrentFlapResolver().resolve(p, sample({ iasKt: 100, flapCount: 2 }), 1000),
       units: 'kmh',

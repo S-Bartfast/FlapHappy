@@ -58,6 +58,8 @@ describe('settings editor: build the AS 33 Me table from scratch', () => {
     expect(await validHead(page)).toContain('Not applied: fix');
     await page.screenshot({ path: `${SHOT_DIR}/flaphappy-editor-incomplete.png`, fullPage: true });
 
+    await fill(page, 'weight_kg.light', '400');
+    await fill(page, 'weight_kg.heavy', '600');
     await fill(page, 'vs_min.no_ballast_kt', '48');
     await fill(page, 'vs_min.max_ballast_kt', '56');
     const no = [62, 74, 86, 100, 118];

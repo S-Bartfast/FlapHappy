@@ -8,7 +8,6 @@ export interface CockpitState {
   sample: SimSample | null;
   /** When the desktop app last received `sample`, in ms. */
   receivedAt: number;
-  ballast: number;
   units: 'kt' | 'kmh';
   zoom: number;
 }

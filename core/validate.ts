@@ -106,6 +106,13 @@ export function validateProfile(p: Profile, opts: ValidateOptions = {}): Validat
     }
   }
 
+  // Optional legacy anchor data is checked as a pair when either is supplied.
+  const weights = p.weight_kg;
+  if (weights && (weights.light !== null || weights.heavy !== null)) {
+    if (!isNum(weights.light) || weights.light <= 0) add('error', 'other', 'weight-light', 'Light flying weight must be positive', 'weight_kg.light');
+    if (!isNum(weights.heavy) || weights.heavy <= 0 || (isNum(weights.light) && weights.heavy <= weights.light)) add('error', 'other', 'weight-heavy', 'Heavy flying weight must exceed Light', 'weight_kg.heavy');
+  }
+
   // --- Required numbers ---
   const b = boundaryVectors(p);
   const barNeeded = n >= 1;

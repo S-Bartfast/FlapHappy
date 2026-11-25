@@ -42,6 +42,9 @@ export interface Profile {
   transitions: Speed[];
   /** Knots. Saved files store this as a single `vne_ms`, with no ballast split. */
   vne: number | null;
+  /** Loaded flying weights for the existing light/heavy speed columns (kg). */
+  weight_kg: { light: number | null; heavy: number | null };
+  /** Legacy file fields retained for compatibility, not used to control live weight. */
   ballast: BallastConfig;
   current_flap: CurrentFlapConfig;
   marker_smoothing_ms: number;

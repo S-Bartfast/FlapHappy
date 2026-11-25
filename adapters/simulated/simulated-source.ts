@@ -25,6 +25,7 @@ export interface SimControls {
   inFlight: boolean;
   onGround: boolean;
   iasKt: number;
+  totalWeightKg: number | null;
   flapIndex: number;
   flapCount: number;
   fault: Fault;
@@ -37,6 +38,7 @@ export function defaultControls(): SimControls {
     inFlight: true,
     onGround: false,
     iasKt: 80,
+    totalWeightKg: null,
     flapIndex: 0,
     flapCount: 6,
     fault: 'none',
@@ -87,6 +89,7 @@ export class SimulatedSource implements DataSource {
     s.inFlight = c.inFlight;
     s.aircraftTitle = c.title;
     s.iasKt = c.iasKt;
+    s.totalWeightKg = c.totalWeightKg;
     s.onGround = c.onGround;
     s.flapCount = c.flapCount;
 

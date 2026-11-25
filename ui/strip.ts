@@ -4,8 +4,8 @@ import { nativeWidth } from '../core/scale';
 import { clear, h, setText, toggleClass } from './dom';
 
 export interface StripOptions {
-  /** Content area for the ballast slider (shown under the tick row). */
-  ballastRow?: HTMLElement | null;
+  /** Content area for the weight indicator (shown under the tick row). */
+  weightRow?: HTMLElement | null;
   title?: string;
 }
 
@@ -75,7 +75,7 @@ export class StripView {
     this.panel.appendChild(iasRow);
     this.panel.appendChild(flapsRow);
     this.panel.appendChild(tickRow);
-    if (this.opts.ballastRow) this.panel.appendChild(this.opts.ballastRow);
+    if (this.opts.weightRow) this.panel.appendChild(this.opts.weightRow);
   }
 
   /** Rebuild cell/tick elements only when the layout signature changes. */

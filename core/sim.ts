@@ -5,6 +5,8 @@ export interface SimSample {
   connected: boolean;
   inFlight: boolean;
   iasKt: number | null;
+  /** Actual loaded aircraft weight in kilograms. Null when unavailable. */
+  totalWeightKg: number | null;
   onGround: boolean | null;
   flapIndex: number | null;
   flapCount: number | null;
@@ -21,6 +23,7 @@ export function emptySample(t = 0): SimSample {
     connected: false,
     inFlight: false,
     iasKt: null,
+    totalWeightKg: null,
     onGround: null,
     flapIndex: null,
     flapCount: null,

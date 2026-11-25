@@ -100,6 +100,7 @@ export function mountDevPanel(container: HTMLElement, app: App): void {
     h('div', { class: 'fh-devpanel' },
       h('div', { class: 'fh-devtitle' }, 'DEV: simulated source'),
       row(lab('IAS'), iasRange, iasNum, lab('kt')),
+      row(lab('Simulated weight (kg)'), h('input', { type: 'number', min: '0', step: '1', class: 'fh-in', 'aria-label': 'Simulated weight (kg)', oninput: (e: Event) => { const v = (e.target as HTMLInputElement).value; c.totalWeightKg = v ? Number(v) : null; sim.tick(0); } })),
       row(lab('Flap handle index'), flapSel, lab('count'), count, lab('title'), title),
       row(toggle('connected', 'connected', 'fh-dev-connected'), toggle('in flight (not paused)', 'inFlight', 'fh-dev-inflight'), toggle('on ground', 'onGround', 'fh-dev-ground')),
       row(lab('Inject fault'), ...faultBtns, readouts.fault),

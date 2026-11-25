@@ -2,6 +2,7 @@ import type { Profile, ValidationResult } from './types';
 import type { SimSample } from './sim';
 import type { CurrentFlap } from './flapmap';
 import { columnEdges, effectiveBoundaries, mapMarker, type MarkerRegion } from './scale';
+import { liveWeight, type WeightState } from './weight';
 import { formatIas, formatTick, type SpeedUnit } from './units';
 
 export type LinkState = 'waiting' | 'nodata' | 'paused' | 'live';
@@ -41,6 +42,7 @@ export interface DisplayModel {
   ticks: string[] | null;
   cells: CellModel[];
   iasText: string;
+  weight: WeightState;
   marker: { pos: number | null; region: MarkerRegion | null; greyed: boolean };
   alert: 'LOW' | 'FAST' | null;
   badge: FlapBadge | null;
@@ -54,8 +56,6 @@ export interface ModelInput {
   validation: ValidationResult | null;
   sample: SimSample | null;
   link: LinkState;
-  /** Ballast fraction 0..1. */
-  f: number;
   /** IAS after display smoothing (falls back to the raw sample when null). */
   ias: number | null;
   flap: CurrentFlap;
@@ -71,7 +71,8 @@ const STATUS: Record<LinkState, string | null> = {
 };
 
 export function buildDisplayModel(inp: ModelInput): DisplayModel {
-  const { profile, validation, sample, link, f, flap } = inp;
+  const { profile, validation, sample, link, flap } = inp;
+  const weight = liveWeight(profile, sample, link === 'live');
   const units = inp.units === 'kmh' ? 'kmh' : 'kt';
   const base: DisplayModel = {
     mode: 'none',
@@ -84,6 +85,7 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
     ticks: null,
     cells: [],
     iasText: formatIas(null, units),
+    weight,
     marker: { pos: null, region: null, greyed: false },
     alert: null,
     badge: null,
@@ -102,9 +104,11 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
   if (live && shown !== null && isFinite(shown)) base.iasText = formatIas(shown, units);
 
   const n = profile.flaps.length;
-  const boundaries = validation.ok ? effectiveBoundaries(profile, f) : null;
+  const boundaries = validation.ok && weight.fraction !== null ? effectiveBoundaries(profile, weight.fraction) : null;
   base.mode = n === 0 ? 'noflaps' : validation.ok ? 'ok' : 'incomplete';
   if (base.mode === 'incomplete') base.incompleteMessage = 'profile incomplete: open settings';
+  else if (!weight.anchorsValid) base.incompleteMessage = 'Set Light and Heavy flying weights in settings';
+  else if (weight.kg === null) base.incompleteMessage = 'Flying weight unavailable';
 
   // Flap cells: one per row.
   if (n > 0 && validation.structureOk) {

@@ -4,7 +4,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { SHOT_DIR } from './browser-env';
-import { createBlankProfile } from '../../core/profile';
+import { createBlankProfile, exportProfileJson } from '../../core/profile';
+import { makeProfile } from '../unit/helpers';
 
 const root = path.resolve(__dirname, '../..');
 const electronBin = (() => {
@@ -49,6 +50,8 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
     for (let i = 0; i < 6; i++) await page.click('.fh-settings .fh-addrow');
     for (let i = 0; i < 6; i++) await page.fill(`.fh-settings [data-path="flaps[${i}].label"]`, labels[i]);
     for (let i = 0; i < 6; i++) await page.fill(`.fh-settings [data-path="flaps[${i}].handle_index"]`, String(i));
+    await page.fill('.fh-settings [data-path="weight_kg.light"]', '400');
+    await page.fill('.fh-settings [data-path="weight_kg.heavy"]', '600');
     await page.fill('.fh-settings [data-path="vs_min.no_ballast_kt"]', '48');
     await page.fill('.fh-settings [data-path="vs_min.max_ballast_kt"]', '56');
     const no = [62, 74, 86, 100, 118];
@@ -63,10 +66,9 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
     await page.screenshot({ path: `${SHOT_DIR}/flaphappy-electron-editor.png` });
     await page.click('.fh-settings .fh-back');
 
-    // Ballast slider to 60 % (persisted), pin the window on top.
-    const slider = (await (await page.$('.fh-display .fh-sl-track'))!.boundingBox())!;
-    await page.mouse.click(slider.x + slider.width * 0.6, slider.y + slider.height / 2);
-    expect(await page.$eval('.fh-display .fh-sl-pct', (e) => e.textContent)).toBe('60%');
+    // Synthetic telemetry is not a saved pilot preference.
+    await page.evaluate(() => { const sim = (window as any).__flapHappy.sim; sim.controls.totalWeightKg = 520; sim.tick(0); });
+    expect(await page.$eval('.fh-display .fh-sl-pct', (e) => e.textContent)).toBe('520 kg');
     await page.click('.fh-display .fh-pin');
     expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isAlwaysOnTop())).toBe(true);
     await page.waitForTimeout(900);
@@ -76,6 +78,7 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
     const onDisk = JSON.parse(fs.readFileSync(file, 'utf8'));
     expect(onDisk.display_name).toBeUndefined();
     expect(onDisk.transitions).toHaveLength(5);
+    expect(onDisk.weight_kg).toEqual({ light: 400, heavy: 600 });
     expect(fs.existsSync(path.join(ud, 'settings.json'))).toBe(true);
     await app.close();
 
@@ -84,14 +87,70 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
     await page.waitForSelector('.fh-display .fh-cell');
     expect(await page.$eval('.fh-display .fh-title', (e) => e.textContent)).toBe('new-profile');
     expect(await page.$$eval('.fh-display .fh-cell', (e) => e.map((x) => x.textContent))).toEqual(labels);
-    expect(await page.$$eval('.fh-display .fh-ticktext', (e) => e.map((x) => x.textContent))).toEqual(['53', '67', '79', '93', '108', '127', '145']); // effective speeds at 60 % ballast
-    expect(await page.$eval('.fh-display .fh-sl-pct', (e) => e.textContent)).toBe('60%');
+    expect(await page.$eval('.fh-display .fh-sl-pct', (e) => e.textContent)).toBe('-- kg');
+    await page.evaluate(() => { const sim = (window as any).__flapHappy.sim; sim.controls.totalWeightKg = 520; sim.tick(0); });
+    expect(await page.$$eval('.fh-display .fh-ticktext', (e) => e.map((x) => x.textContent))).toEqual(['53', '67', '79', '93', '108', '127', '145']);
+    expect(await page.$eval('.fh-display .fh-sl-pct', (e) => e.textContent)).toBe('520 kg');
     expect(await page.$('.fh-display .fh-sl-flag')).toBeNull();
     expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isAlwaysOnTop())).toBe(true);
     await page.waitForTimeout(500);
     await page.screenshot({ path: `${SHOT_DIR}/flaphappy-electron-restarted.png` });
     await app.close();
     fs.rmSync(ud, { recursive: true, force: true });
+  });
+
+  it('desktop and served cockpit panel use the same live weight and neither offers a ballast control', async () => {
+    const ud = fs.mkdtempSync(path.join(os.tmpdir(), 'flaphappy-live-weight-'));
+    const fixture = makeProfile(2, { id: 'weight-fixture' });
+    fs.mkdirSync(path.join(ud, 'profiles'));
+    fs.writeFileSync(path.join(ud, 'profiles', fixture.id + '.json'), exportProfileJson(fixture));
+    fs.writeFileSync(path.join(ud, 'settings.json'), JSON.stringify({ schema: 'flaphappy.settings/1', last_profile_id: fixture.id, active_by_title: { 'Simulated glider': fixture.id } }));
+    const { app, page } = await launch(ud);
+    await page.waitForFunction(() => (window as any).__flapHappy.profileId() === 'weight-fixture');
+    let browser: import('playwright-core').Browser | undefined;
+    try {
+      const { chromium } = await import('playwright-core');
+      const executablePath = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', '/usr/bin/chromium', '/usr/bin/google-chrome'].find(p => p && fs.existsSync(p));
+      browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
+      const panel = await browser.newPage();
+      const panelUrl = 'http://127.0.0.1:47321';
+      await panel.goto(panelUrl + '/panel.html');
+      const simulated = (patch: Record<string, unknown>) => page.evaluate(value => {
+        const sim = (window as any).__flapHappy.sim;
+        Object.assign(sim.controls, value);
+        sim.tick(0);
+      }, patch);
+      const verify = async (kg: number | null, ticks: string[]) => {
+        await simulated({ totalWeightKg: kg });
+        const expected = kg === null ? '-- kg' : kg + ' kg';
+        for (const view of [page, panel]) {
+          await view.waitForFunction(text => document.querySelector('.fh-sl-pct')?.textContent === text, expected);
+          const visibleTicks = await view.$$eval('.fh-ticktext', els => els.filter(x => getComputedStyle(x).display !== 'none').map(x => x.textContent));
+          expect(visibleTicks).toEqual(ticks);
+          expect(await view.locator('.fh-weight-row input, .fh-weight-row button').count()).toBe(0);
+        }
+      };
+      await verify(300, ['40','52','82']);
+      await verify(500, ['45','59','82']);
+      await verify(800, ['50','66','82']);
+      expect((await fetch(panelUrl + '/api/ballast', { method: 'POST', body: '{"f":0}' })).status).toBe(405);
+      await verify(null, []);
+      await verify(500, ['45','59','82']);
+      // A lost or invalid panel response cannot retain the last flying weight.
+      await panel.route('**/api/state', route => route.fulfill({ status: 200, body: 'not JSON' }));
+      await panel.waitForFunction(() => document.querySelector<HTMLElement>('.fh-fit')?.style.display === 'none');
+      await panel.unroute('**/api/state');
+      await panel.waitForFunction(() => document.querySelector('.fh-sl-pct')?.textContent === '500 kg');
+      await simulated({ fault: 'stale' });
+      for (const view of [page, panel]) {
+        await view.waitForFunction(() => document.querySelector('.fh-sl-pct')?.textContent === '-- kg');
+        expect(await view.locator('.fh-ticktext:visible').count()).toBe(0);
+      }
+    } finally {
+      await browser?.close();
+      await app.close();
+      fs.rmSync(ud, { recursive: true, force: true });
+    }
   });
 
   it('starts in compact mode with no MINI/FULL button and keeps the display', async () => {

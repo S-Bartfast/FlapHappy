@@ -6,7 +6,7 @@ const INVOKE = new Set([
   'host:openProfilesFolder', 'host:quit', 'host:installPanel', 'source:start', 'source:stop', 'source:setLvar',
   'panel:state',
 ]);
-const EVENTS = new Set(['sample', 'source:log', 'panel:ballast']);
+const EVENTS = new Set(['sample', 'source:log']);
 
 contextBridge.exposeInMainWorld('flapHappyBridge', {
   invoke(channel: string, ...args: unknown[]): Promise<unknown> {

@@ -56,7 +56,7 @@ export class SimConnectSource implements DataSource {
     }, RECONNECT_MS);
     this.watchdog = setInterval(() => {
       if (!this.handle) this.emitDisconnected();
-      else if (Date.now() - this.lastDataAt > 1000) this.emit(); // keeps the UI's stale detection honest while paused
+      else if (Date.now() - this.lastDataAt > 1000) this.emit(false); // never advance an old sample timestamp
     }, WATCHDOG_MS);
   }
 
@@ -129,6 +129,7 @@ export class SimConnectSource implements DataSource {
     num('FLAPS NUM HANDLE POSITIONS', 'number');
     num('FLAPS HANDLE PERCENT', 'percent over 100');
     num('SIM ON GROUND', 'bool');
+    num('TOTAL WEIGHT', 'kilograms');
     h.addToDataDefinition(DEF_MAIN, 'TITLE', null, SimConnectDataType.STRING256);
 
     h.subscribeToSystemEvent(EV_PAUSE, 'Pause');
@@ -138,6 +139,7 @@ export class SimConnectSource implements DataSource {
     this.registerLvar(h);
 
     h.on('simObjectData', (d) => {
+      if (this.handle !== h) return;
       if (d.requestID === REQ_MAIN) {
         const r = d.data;
         const ias = r.readFloat64();
@@ -145,6 +147,7 @@ export class SimConnectSource implements DataSource {
         const count = r.readFloat64();
         const pct = r.readFloat64();
         const ground = r.readFloat64();
+        const weight = r.readFloat64();
         const title = r.readString256();
         this.lastDataAt = Date.now();
         this.last = {
@@ -152,6 +155,7 @@ export class SimConnectSource implements DataSource {
           connected: true,
           inFlight: true,
           iasKt: ias,
+          totalWeightKg: isFinite(weight) && weight > 0 ? weight : null,
           flapIndex: idx,
           flapCount: count,
           flapPercent: pct,
@@ -167,7 +171,7 @@ export class SimConnectSource implements DataSource {
     h.on('event', (e) => {
       if (e.clientEventId === EV_PAUSE) this.paused = e.data === 1;
       else if (e.clientEventId === EV_SIM) this.simRunning = e.data === 1;
-      this.emit();
+      this.emit(false);
     });
     h.on('exception', (ex) => this.log('SimConnect exception: ' + JSON.stringify(ex)));
     h.on('quit', () => {

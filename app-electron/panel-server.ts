@@ -14,17 +14,16 @@ const types: Record<string, string> = {
 
 /**
  * Local page the in-sim panel loads. Bound to 127.0.0.1 only.
- * The desktop app publishes the live profile and sim sample; the panel posts ballast changes back.
+ * The desktop app publishes the live profile and sim sample; the panel is read-only.
  */
 export function startPanelServer(opts: {
   root: string;
   version: string;
   getState: () => CockpitState | null;
-  onBallast: (f: number) => void;
 }): Promise<Server> {
   const server = createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
@@ -37,23 +36,7 @@ export function startPanelServer(opts: {
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/state') {
-      json(res, 200, opts.getState() ?? { ready: false, profile: null, sample: null, receivedAt: 0, ballast: 0, units: 'kt', zoom: 1 });
-      return;
-    }
-    if (req.method === 'POST' && url.pathname === '/api/ballast') {
-      const body = await readBody(req);
-      let f = NaN;
-      try {
-        f = Number(JSON.parse(body).f);
-      } catch {
-        f = NaN;
-      }
-      if (!isFinite(f)) {
-        json(res, 400, { ok: false });
-        return;
-      }
-      opts.onBallast(Math.max(0, Math.min(1, f)));
-      json(res, 200, { ok: true });
+      json(res, 200, opts.getState() ?? { ready: false, profile: null, sample: null, receivedAt: 0, units: 'kt', zoom: 1 });
       return;
     }
     if (req.method !== 'GET') {
@@ -81,16 +64,4 @@ function json(res: import('node:http').ServerResponse, status: number, body: unk
   const text = JSON.stringify(body);
   res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
   res.end(text);
-}
-
-function readBody(req: import('node:http').IncomingMessage): Promise<string> {
-  return new Promise((resolve) => {
-    const chunks: Buffer[] = [];
-    let size = 0;
-    req.on('data', (c: Buffer) => {
-      size += c.length;
-      if (size < 100000) chunks.push(c);
-    });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-  });
 }

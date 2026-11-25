@@ -5,27 +5,26 @@ import { CurrentFlapResolver } from '../core/flapmap';
 import { buildDisplayModel, deriveLink } from '../core/display-model';
 import { h, setText } from './dom';
 import { StripView } from './strip';
-import { BallastSlider } from './slider';
+import { WeightIndicator } from './slider';
 
 /**
  * Display shown inside the sim. It reads the desktop app over localhost and does not keep its own profile.
  * XMLHttpRequest only: the in-sim browser has no fetch.
  */
 const root = document.getElementById('app') as HTMLElement;
-const note = h('div', { class: 'fh-hint' }, 'Waiting for Flap Happy…');
-const slider = new BallastSlider((f) => postBallast(f));
-const strip = new StripView({ ballastRow: slider.el });
+const note = h('div', { class: 'fh-hint' }, 'Waiting for Flap Happy.');
+const slider = new WeightIndicator();
+const strip = new StripView({ weightRow: slider.el });
 root.appendChild(note);
 root.appendChild(strip.el);
 
-let holdUntil = 0;
-let shownBallast = -1;
 let profileId = '';
 const resolver = new CurrentFlapResolver();
 
 function xhr(method: string, path: string, body: string | null, done: (status: number, text: string) => void): void {
   const req = new XMLHttpRequest();
   req.open(method, path, true);
+  req.timeout = 1500;
   req.onreadystatechange = () => {
     if (req.readyState === 4) done(req.status, req.responseText || '');
   };
@@ -33,45 +32,31 @@ function xhr(method: string, path: string, body: string | null, done: (status: n
   req.send(body);
 }
 
-function postBallast(f: number): void {
-  holdUntil = Date.now() + 800;
-  shownBallast = f;
-  xhr('POST', '/api/ballast', JSON.stringify({ f: f }), () => undefined);
-}
-
 function paint(state: CockpitState): void {
   if (!state.ready || !state.profile) {
-    setText(note, 'Waiting for Flap Happy…');
-    note.style.display = 'block';
+    unavailable();
     return;
   }
   note.style.display = 'none';
+  strip.el.style.display = '';
   const profile = state.profile as Profile;
   if (profile.id !== profileId) {
     profileId = profile.id;
     resolver.reset();
   }
   const now = Date.now();
-  const holding = now < holdUntil && shownBallast >= 0;
-  const f = holding ? shownBallast : state.ballast;
   const validation = validateProfile(profile);
   const model = buildDisplayModel({
     profile,
     validation,
     sample: state.sample,
     link: deriveLink(state.sample, state.receivedAt, now),
-    f,
     ias: state.sample ? state.sample.iasKt : null,
     flap: resolver.resolve(profile, state.sample, now),
     units: state.units === 'kmh' ? 'kmh' : 'kt',
   });
   strip.render(model, { profile, zoom: state.zoom });
-  if (!holding && state.ballast !== shownBallast) {
-    shownBallast = state.ballast;
-    slider.render(profile, { f: state.ballast, unconfirmed: false, restored: false });
-  } else if (holding) {
-    slider.render(profile, { f: shownBallast, unconfirmed: false, restored: false });
-  }
+  slider.render(model.weight);
 }
 
 function poll(): void {
@@ -80,12 +65,20 @@ function poll(): void {
       try {
         paint(JSON.parse(text) as CockpitState);
       } catch {
-        setText(note, 'Waiting for Flap Happy…');
+        unavailable();
       }
-    }
+    } else unavailable();
     setTimeout(poll, 200);
   });
 }
 
-slider.render(null, { f: 1, unconfirmed: false, restored: false });
+function unavailable(): void {
+  setText(note, 'Waiting for Flap Happy.');
+  profileId = '';
+  resolver.reset();
+  note.style.display = 'block';
+  strip.el.style.display = 'none';
+  slider.render({ kg: null, fraction: null, anchorsValid: false });
+}
+unavailable();
 poll();

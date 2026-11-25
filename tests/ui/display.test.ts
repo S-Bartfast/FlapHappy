@@ -20,6 +20,7 @@ async function load(page: Page, p: Profile) {
     const w = window as any;
     w.__flapHappy.app.setActiveProfile(prof, true);
     w.__flapHappy.sim.controls.flapCount = prof.flaps.length;
+    w.__flapHappy.sim.controls.totalWeightKg = prof.weight_kg.light;
     w.__flapHappy.sim.tick(0);
   }, p as any);
   await settle(page);
@@ -33,10 +34,7 @@ const sim = (page: Page, patch: Record<string, unknown>) =>
   }, patch);
 
 async function clickBallast(page: Page, frac: number) {
-  const box = (await (await page.$('.fh-display .fh-sl-track'))!.boundingBox())!;
-  // Stay a hair inside the track so the ends still land on it; the 5 % snap rounds to 0 / 1.
-  const f = Math.min(0.995, Math.max(0.005, frac));
-  await page.mouse.click(box.x + box.width * f, box.y + box.height / 2);
+  await sim(page, { totalWeightKg: 400 + frac * 200 });
 }
 
 const geometry = (page: Page) =>
@@ -65,7 +63,7 @@ describe('display layout: bar, ticks and flap cells share N columns', () => {
       const page = await env.newPage('?seed=demo');
       const p = makeProfile(n);
       await load(page, p);
-      await sim(page, { flapIndex: Math.min(1, n - 1), iasKt: 60 });
+      await sim(page, { flapIndex: Math.min(1, n - 1), iasKt: 60, totalWeightKg: 600 });
       await settle(page);
       const g = await geometry(page);
       expect(g.cells).toBe(n);
@@ -85,7 +83,7 @@ describe('display layout: bar, ticks and flap cells share N columns', () => {
     });
   }
 
-  it('slider re-aligns the ticks (labels follow ballast) and they stay aligned with the cells', async () => {
+  it('weight re-aligns the ticks (labels follow actual weight) and they stay aligned with the cells', async () => {
     const page = await env.newPage('?seed=demo');
     await load(page, makeProfile(6));
     const labels = () => page.$$eval('.fh-display .fh-ticktext', (els) => els.map((e) => e.textContent));
@@ -220,7 +218,7 @@ describe('states and the current-flap fallback chain (simulated feed)', () => {
     const readoutClass = (c: string) => page.$eval('.fh-display .fh-readout', (e, cls) => e.classList.contains(cls), c);
     expect(await readoutClass('low')).toBe(true);
     await page.screenshot({ path: `${SHOT_DIR}/flaphappy-state-low.png` });
-    await sim(page, { iasKt: 150 });
+    await sim(page, { iasKt: 200 });
     await settle(page, 700);
     expect(await readoutClass('low')).toBe(false);
     expect(await readoutClass('fast')).toBe(true);
@@ -252,6 +250,7 @@ describe('states and the current-flap fallback chain (simulated feed)', () => {
   it('N = 0 shows "no flaps"', async () => {
     const page = await env.newPage('?seed=demo');
     const p = makeProfile(0);
+    p.weight_kg = { light: 400, heavy: 600 };
     p.vs_min = { no_ballast_kt: 40, max_ballast_kt: 40 };
     p.vne = 120;
     await load(page, p);
@@ -263,30 +262,28 @@ describe('states and the current-flap fallback chain (simulated feed)', () => {
   });
 });
 
-describe('ballast slider', () => {
-  it('only the label, slider and readout; click-to-set, drag snap, ends', async () => {
+
+describe('read-only weight', () => {
+  it('displays real weight while clamping the thumb, ignores clicks, and clears stale values', async () => {
     const page = await env.newPage('?seed=demo');
     await load(page, makeProfile(6));
-    expect(await page.$$eval('.fh-display .fh-ballast-row button', (e) => e.length)).toBe(0);
     const read = () => page.$eval('.fh-display .fh-sl-pct', (e) => e.textContent);
-    expect(await page.$('.fh-display .fh-sl-flag')).toBeNull();
-    const box = (await (await page.$('.fh-display .fh-sl-track'))!.boundingBox())!;
-    await clickBallast(page, 0.5);
-    expect(await read()).toBe('50%');
-    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(box.x + box.width * 0.733, box.y + box.height / 2);
-    await page.mouse.up();
-    expect(await read()).toBe('75%'); // snapped to 5 %
-    await clickBallast(page, 0);
-    expect(await read()).toBe('0%');
-    await clickBallast(page, 1);
-    expect(await read()).toBe('100%');
-    await page.screenshot({ path: `${SHOT_DIR}/flaphappy-display-ballast-max.png` });
-    // persisted per profile
-    await page.waitForTimeout(700);
-    const stored = await page.evaluate(async () => (window as any).__flapHappy.app.store.getSettings());
-    expect(stored.ballast_by_profile['test-6'] ?? stored.ballast_by_profile['as33-18m']).toBe(1);
+    const thumb = () => page.$eval('.fh-display .fh-sl-thumb', (e) => (e as HTMLElement).style.left);
+    await sim(page, { totalWeightKg: 300 });
+    expect(await read()).toBe('300 kg');
+    expect(await thumb()).toBe('0%');
+    await sim(page, { totalWeightKg: 700 });
+    expect(await read()).toBe('700 kg');
+    expect(await thumb()).toBe('100%');
+    await page.click('.fh-display .fh-sl-track');
+    expect(await read()).toBe('700 kg');
+    await sim(page, { totalWeightKg: null });
+    expect(await read()).toBe('-- kg');
+    await sim(page, { totalWeightKg: 500 });
+    expect(await read()).toBe('500 kg');
+    await sim(page, { fault: 'stale' });
+    await page.waitForTimeout(2100);
+    expect(await read()).toBe('-- kg');
     await page.close();
   });
 });

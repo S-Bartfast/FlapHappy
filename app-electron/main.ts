@@ -203,7 +203,6 @@ if (!app.requestSingleInstanceLock() && !cli.userData) {
         root: path.join(__dirname, 'renderer'),
         version: app.getVersion(),
         getState: () => cockpitState,
-        onBallast: (f) => send('panel:ballast', f),
       });
     } catch (e) {
       console.error('Cockpit panel server did not start', e);
