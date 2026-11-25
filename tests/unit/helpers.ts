@@ -6,7 +6,7 @@ import { emptySample, type SimSample } from '../../core/sim';
 export function makeProfile(n: number, opts: { id?: string } = {}): Profile {
   const p = createBlankProfile(opts.id ?? `test-${n}`);
   for (let i = 0; i < n; i++) {
-    p.flaps.push({ label: String(i + 1), handle_index: i, vfe_kt: 200 });
+    p.flaps.push({ label: String(i + 1), handle_index: i });
   }
   p.weight_kg = { light: 400, heavy: 600 };
   p.vs_min = { no_ballast_kt: 40, max_ballast_kt: 50 };

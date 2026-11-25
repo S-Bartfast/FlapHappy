@@ -32,17 +32,18 @@ describe('SimConnect flying weight', () => {
       expect(definition.map(call => [call[1], call[2]])).toEqual([
         ['AIRSPEED INDICATED', 'knots'], ['FLAPS HANDLE INDEX', 'number'],
         ['FLAPS NUM HANDLE POSITIONS', 'number'], ['FLAPS HANDLE PERCENT', 'percent over 100'],
-        ['SIM ON GROUND', 'bool'], ['TOTAL WEIGHT', 'kilograms'], ['TITLE', null],
+        ['SIM ON GROUND', 'bool'], ['TOTAL WEIGHT', 'kilograms'], ['PLANE ALT ABOVE GROUND', 'feet'],
+        ['AMBIENT WIND VELOCITY', 'knots'], ['TITLE', null],
       ]);
       const receive = (weight: number) => {
-        const values = [75, 2, 8, 0.25, 0, weight];
+        const values = [75, 2, 8, 0.25, 0, weight, 637.5, 14.25];
         events.get('simObjectData')!({
           requestID: 1,
           data: { readFloat64: () => values.shift(), readString256: () => 'fixture' },
         });
       };
       receive(537.25);
-      expect(samples.at(-1)).toMatchObject({ totalWeightKg: 537.25, iasKt: 75, flapIndex: 2, aircraftTitle: 'fixture' });
+      expect(samples.at(-1)).toMatchObject({ totalWeightKg: 537.25, aglFt: 637.5, windKt: 14.25, iasKt: 75, flapIndex: 2, aircraftTitle: 'fixture' });
       const timestamp = samples.at(-1)!.t;
       await vi.advanceTimersByTimeAsync(2000);
       expect(samples.at(-1)!.t).toBe(timestamp);

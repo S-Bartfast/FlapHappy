@@ -18,6 +18,7 @@ const settle = (page: Page, ms = 350) => page.waitForTimeout(ms);
 async function load(page: Page, p: Profile) {
   await page.evaluate((prof) => {
     const w = window as any;
+    w.__flapHappy.app.setShowTransitions(true);
     w.__flapHappy.app.setActiveProfile(prof, true);
     w.__flapHappy.sim.controls.flapCount = prof.flaps.length;
     w.__flapHappy.sim.controls.totalWeightKg = prof.weight_kg.light;

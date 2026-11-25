@@ -32,6 +32,26 @@ export function mountDevPanel(container: HTMLElement, app: App): void {
     sim.tick(0);
   }
 
+  const aglRange = h('input', { type: 'range', min: '0', max: '2000', step: '10', value: String(c.aglFt), class: 'fh-dev-aglrange', 'aria-label': 'Simulated AGL', oninput: (e: Event) => setAgl(Number((e.target as HTMLInputElement).value)) }) as HTMLInputElement;
+  const aglNum = h('input', { type: 'number', min: '0', max: '20000', step: '10', value: String(c.aglFt), class: 'fh-in fh-dev-agl', 'aria-label': 'Simulated height above ground', oninput: (e: Event) => setAgl(Number((e.target as HTMLInputElement).value)) }) as HTMLInputElement;
+  function setAgl(v: number): void {
+    if (!isFinite(v)) return;
+    c.aglFt = v;
+    aglRange.value = String(v);
+    if (document.activeElement !== aglNum) aglNum.value = String(v);
+    sim.tick(0);
+  }
+
+  const windRange = h('input', { type: 'range', min: '0', max: '40', step: '1', value: String(c.windKt), class: 'fh-dev-aglrange', 'aria-label': 'Simulated wind', oninput: (e: Event) => setWind(Number((e.target as HTMLInputElement).value)) }) as HTMLInputElement;
+  const windNum = h('input', { type: 'number', min: '0', max: '200', step: '1', value: String(c.windKt), class: 'fh-in fh-dev-agl', 'aria-label': 'Simulated wind speed', oninput: (e: Event) => setWind(Number((e.target as HTMLInputElement).value)) }) as HTMLInputElement;
+  function setWind(v: number): void {
+    if (!isFinite(v)) return;
+    c.windKt = Math.max(0, v);
+    windRange.value = String(c.windKt);
+    if (document.activeElement !== windNum) windNum.value = String(c.windKt);
+    sim.tick(0);
+  }
+
   const flapSel = h('select', { class: 'fh-select fh-dev-flap', 'aria-label': 'Simulated flap handle index', onchange: (e: Event) => { c.flapIndex = Number((e.target as HTMLSelectElement).value); sim.tick(0); } }) as HTMLSelectElement;
   const count = h('input', { type: 'number', min: '0', max: '16', value: String(c.flapCount), class: 'fh-in fh-dev-count', 'aria-label': 'Simulated flap count', oninput: (e: Event) => { c.flapCount = Math.max(0, Math.round(Number((e.target as HTMLInputElement).value) || 0)); fillFlaps(); sim.tick(0); } }) as HTMLInputElement;
   function fillFlaps(): void {
@@ -101,6 +121,8 @@ export function mountDevPanel(container: HTMLElement, app: App): void {
       h('div', { class: 'fh-devtitle' }, 'DEV: simulated source'),
       row(lab('IAS'), iasRange, iasNum, lab('kt')),
       row(lab('Simulated weight (kg)'), h('input', { type: 'number', min: '0', step: '1', class: 'fh-in', 'aria-label': 'Simulated weight (kg)', oninput: (e: Event) => { const v = (e.target as HTMLInputElement).value; c.totalWeightKg = v ? Number(v) : null; sim.tick(0); } })),
+      row(lab('AGL'), aglRange, aglNum, lab('ft')),
+      row(lab('Wind'), windRange, windNum, lab('kt')),
       row(lab('Flap handle index'), flapSel, lab('count'), count, lab('title'), title),
       row(toggle('connected', 'connected', 'fh-dev-connected'), toggle('in flight (not paused)', 'inFlight', 'fh-dev-inflight'), toggle('on ground', 'onGround', 'fh-dev-ground')),
       row(lab('Inject fault'), ...faultBtns, readouts.fault),

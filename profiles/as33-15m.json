@@ -86,9 +86,6 @@
   },
   "marker_smoothing_ms": 300,
   "bank_scaling": "off",
-  "display": {
-    "vfe_overlay": false
-  },
   "source": "user",
   "notes": "Example speeds so the display can be tried without real data. Replace with your own numbers."
 }

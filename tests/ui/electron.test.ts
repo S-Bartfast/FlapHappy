@@ -104,7 +104,7 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
     const fixture = makeProfile(2, { id: 'weight-fixture' });
     fs.mkdirSync(path.join(ud, 'profiles'));
     fs.writeFileSync(path.join(ud, 'profiles', fixture.id + '.json'), exportProfileJson(fixture));
-    fs.writeFileSync(path.join(ud, 'settings.json'), JSON.stringify({ schema: 'flaphappy.settings/1', last_profile_id: fixture.id, active_by_title: { 'Simulated glider': fixture.id } }));
+    fs.writeFileSync(path.join(ud, 'settings.json'), JSON.stringify({ schema: 'flaphappy.settings/1', last_profile_id: fixture.id, active_by_title: { 'Simulated glider': fixture.id }, ui: { show_transitions: true } }));
     const { app, page } = await launch(ud);
     await page.waitForFunction(() => (window as any).__flapHappy.profileId() === 'weight-fixture');
     let browser: import('playwright-core').Browser | undefined;
@@ -130,6 +130,10 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
           expect(await view.locator('.fh-weight-row input, .fh-weight-row button, .fh-ballast-row').count()).toBe(0);
         }
       };
+      await simulated({ aglFt: 650, windKt: 13 });
+      for (const view of [page, panel]) {
+        await view.waitForFunction(() => document.querySelector('.fh-aglread')?.textContent === '650 ft' && document.querySelector('.fh-aglwindtext')?.textContent === '13 kt');
+      }
       await verify(300, ['40','52','82']);
       await verify(500, ['45','59','82']);
       await verify(800, ['50','66','82']);
@@ -145,6 +149,8 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
       for (const view of [page, panel]) {
         await view.waitForFunction(() => document.querySelector('.fh-sl-pct')?.textContent === '-- kg');
         expect(await view.locator('.fh-ticktext:visible').count()).toBe(0);
+        expect(await view.locator('.fh-aglread').textContent()).toBe('--- ft');
+        expect(await view.locator('.fh-aglwindtext').textContent()).toBe('--- kt');
       }
     } finally {
       await browser?.close();
@@ -163,7 +169,7 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
     const file = JSON.parse(exportProfileJson(legacy));
     delete file.weight_kg;
     fs.writeFileSync(path.join(ud, 'profiles', legacy.id + '.json'), JSON.stringify(file));
-    fs.writeFileSync(path.join(ud, 'settings.json'), JSON.stringify({ schema: 'flaphappy.settings/1', last_profile_id: legacy.id, active_by_title: { 'Simulated glider': legacy.id } }));
+    fs.writeFileSync(path.join(ud, 'settings.json'), JSON.stringify({ schema: 'flaphappy.settings/1', last_profile_id: legacy.id, active_by_title: { 'Simulated glider': legacy.id }, ui: { show_transitions: true } }));
     let { app, page } = await launch(ud);
     let browser: import('playwright-core').Browser | undefined;
     try {
@@ -179,7 +185,10 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
         expect(await view.locator('.fh-weight-row').count()).toBe(0);
         expect(await view.$$eval('.fh-ticktext:visible', els => els.map(x => x.textContent))).toEqual(ticks);
       };
-      for (const view of [page, panel]) await read(view, '25% 50 L', ['43', '56', '82']);
+      for (const view of [page, panel]) {
+        await read(view, '25% 50 L', ['43', '56', '82']);
+        await view.waitForFunction(() => document.querySelector('.fh-aglread')?.textContent === '600 ft' && document.querySelector('.fh-aglwindtext')?.textContent === '12 kt');
+      }
       const click = async (view: Page, f: number) => {
         const track = view.locator('.fh-ballast-row .fh-sl-track');
         const r = (await track.boundingBox())!;
@@ -188,7 +197,7 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
       };
       await click(panel, 0.75);
       for (const view of [page, panel]) await read(view, '75% 150 L', ['48', '63', '82']);
-      // A two-flap strip is taller than the old 200 px compact window at this width.
+      // A two-flap strip with transitions and AGL can exceed the compact window height.
       // Resize the actual Electron window, just as a pilot can, before clicking.
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(640, 320));
       await page.waitForFunction(() => window.innerHeight >= 300);

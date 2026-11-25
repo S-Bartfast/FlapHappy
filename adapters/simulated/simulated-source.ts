@@ -26,6 +26,10 @@ export interface SimControls {
   onGround: boolean;
   iasKt: number;
   totalWeightKg: number | null;
+  /** Height above the ground, in feet. */
+  aglFt: number;
+  /** Ambient wind speed, in knots. */
+  windKt: number;
   flapIndex: number;
   flapCount: number;
   fault: Fault;
@@ -39,6 +43,8 @@ export function defaultControls(): SimControls {
     onGround: false,
     iasKt: 80,
     totalWeightKg: null,
+    aglFt: 600,
+    windKt: 12,
     flapIndex: 0,
     flapCount: 6,
     fault: 'none',
@@ -90,6 +96,8 @@ export class SimulatedSource implements DataSource {
     s.aircraftTitle = c.title;
     s.iasKt = c.iasKt;
     s.totalWeightKg = c.totalWeightKg;
+    s.aglFt = isFinite(c.aglFt) ? c.aglFt : null;
+    s.windKt = isFinite(c.windKt) ? c.windKt : null;
     s.onGround = c.onGround;
     s.flapCount = c.flapCount;
 

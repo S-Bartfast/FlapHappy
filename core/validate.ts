@@ -15,11 +15,6 @@ function isNum(x: unknown): x is number {
   return typeof x === 'number' && isFinite(x);
 }
 
-/** Index into `boundaryVectors` of the speed at the top of flap `flap` (the next transition, or Vne). */
-function upperBoundaryIndex(_p: Profile, flap: number): number {
-  return flap + 1;
-}
-
 export interface Boundaries {
   names: string[];
   no: Array<number | null>;
@@ -193,20 +188,6 @@ export function validateProfile(p: Profile, opts: ValidateOptions = {}): Validat
     for (let i = 0; i < b.names.length - 1; i++) dirCheck(i);
   }
   if (n > SOFT_MAX_ROWS) add('warning', 'other', 'many-rows', `More than ${SOFT_MAX_ROWS} flap rows: cells get narrow for VR`);
-
-  // --- Placard hints ---
-  if (barNeeded) {
-    for (let k = 0; k < n; k++) {
-      const vfe = p.flaps[k].vfe_kt;
-      if (!isNum(vfe)) continue;
-      const up = upperBoundaryIndex(p, k);
-      const upNo = b.no[up];
-      const upMax = b.max[up];
-      if ((isNum(upNo) && upNo > vfe) || (isNum(upMax) && upMax > vfe)) {
-        add('warning', 'speeds', 'above-vfe', `Flap "${p.flaps[k].label}" is used up to ${Math.max(upNo ?? 0, upMax ?? 0)} kt, above its VFE of ${vfe} kt`, `flaps[${k}].vfe_kt`);
-      }
-    }
-  }
 
   const errors = issues.filter((i) => i.level === 'error');
   const warnings = issues.filter((i) => i.level === 'warning');

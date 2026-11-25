@@ -3,7 +3,7 @@ import type { SimSample } from './sim';
 import type { CurrentFlap } from './flapmap';
 import { columnEdges, effectiveBoundaries, mapMarker, type MarkerRegion } from './scale';
 import { interpolationFraction, liveWeight, type WeightState } from './weight';
-import { formatIas, formatTick, type SpeedUnit } from './units';
+import { aglMarkLabels, aglMarkPositions, defaultAglScale, formatAgl, formatIas, formatTick, type AglScale, type HeightUnit, type SpeedUnit } from './units';
 
 export type LinkState = 'waiting' | 'nodata' | 'paused' | 'live';
 
@@ -20,8 +20,6 @@ export function deriveLink(sample: SimSample | null, lastRxMs: number, nowMs: nu
 export interface CellModel {
   label: string;
   state: 'current' | 'other';
-  /** Optional overlay: current flap above its placard speed. */
-  overVfe: boolean;
 }
 
 export interface FlapBadge {
@@ -43,6 +41,17 @@ export interface DisplayModel {
   cells: CellModel[];
   iasText: string;
   weight: WeightState;
+  /** Height above ground. The bar runs from Bottom to Top. */
+  aglText: string;
+  aglPos: number | null;
+  /** Green while the height is from Low to High, inclusive. */
+  aglInBand: boolean;
+  /** Tick labels at Low, the middle of that band, and High, in the current height unit. */
+  aglMarks: string[];
+  /** Same ticks as fractions of the bar. Null hides a tick that falls outside Bottom–Top. */
+  aglMarkPos: Array<number | null>;
+  /** Ambient wind speed, shown on the left of the height bar. */
+  windText: string;
   marker: { pos: number | null; region: MarkerRegion | null; greyed: boolean };
   alert: 'LOW' | 'FAST' | null;
   badge: FlapBadge | null;
@@ -60,9 +69,15 @@ export interface ModelInput {
   manualBallast?: number;
   /** IAS after display smoothing (falls back to the raw sample when null). */
   ias: number | null;
+  /** Height after the same smoothing (falls back to the raw sample when null). */
+  aglFt?: number | null;
   flap: CurrentFlap;
   /** Display unit. The profile's working speeds are knots. */
   units?: SpeedUnit;
+  /** Height unit for the AGL bar. */
+  height?: HeightUnit;
+  /** AGL bar ends and the green band, in feet. */
+  agl?: AglScale;
 }
 
 const STATUS: Record<LinkState, string | null> = {
@@ -76,6 +91,8 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
   const { profile, validation, sample, link, flap } = inp;
   const weight = liveWeight(profile, sample, link === 'live');
   const units = inp.units === 'kmh' ? 'kmh' : 'kt';
+  const height: HeightUnit = inp.height === 'm' ? 'm' : 'ft';
+  const aglScale = inp.agl ?? defaultAglScale();
   const base: DisplayModel = {
     mode: 'none',
     link,
@@ -88,6 +105,12 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
     cells: [],
     iasText: formatIas(null, units),
     weight,
+    aglText: formatAgl(null, height, aglScale).text,
+    aglPos: null,
+    aglInBand: false,
+    aglMarks: aglMarkLabels(height, aglScale),
+    aglMarkPos: aglMarkPositions(aglScale),
+    windText: formatIas(null, units),
     marker: { pos: null, region: null, greyed: false },
     alert: null,
     badge: null,
@@ -104,6 +127,17 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
   const hasIas = live && rawIas !== null && isFinite(rawIas);
   const shown = sample ? sample.iasKt : null;
   if (live && shown !== null && isFinite(shown)) base.iasText = formatIas(shown, units);
+  if (live && sample && sample.aglFt !== null && isFinite(sample.aglFt)) {
+    const smoothed = inp.aglFt !== undefined && inp.aglFt !== null && isFinite(inp.aglFt) ? inp.aglFt : sample.aglFt;
+    const agl = formatAgl(sample.aglFt, height, aglScale);
+    const bar = formatAgl(smoothed, height, aglScale);
+    base.aglText = agl.text;
+    base.aglPos = bar.pos;
+    base.aglInBand = bar.inBand;
+  }
+  if (live && sample && sample.windKt !== null && isFinite(sample.windKt)) {
+    base.windText = formatIas(Math.max(0, sample.windKt), units);
+  }
 
   const n = profile.flaps.length;
   const fraction = interpolationFraction(profile, weight, inp.manualBallast);
@@ -116,17 +150,12 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
   if (n > 0 && validation.structureOk) {
     const current = live || link === 'paused' || link === 'nodata' ? flap.rowIndex : null;
     base.currentRow = link === 'waiting' ? null : current;
-    base.cells = profile.flaps.map((row, i) => {
-      const isCur = base.currentRow === i;
-      const vfe = typeof row.vfe_kt === 'number' ? row.vfe_kt : null;
-      return {
-        label: row.label,
-        state: isCur ? 'current' : 'other',
-        overVfe: !!(isCur && profile.display.vfe_overlay && hasIas && vfe !== null && (rawIas as number) > vfe),
-      };
-    });
+    base.cells = profile.flaps.map((row, i) => ({
+      label: row.label,
+      state: base.currentRow === i ? 'current' : 'other',
+    }));
   } else if (n > 0) {
-    base.cells = profile.flaps.map((row) => ({ label: row.label, state: 'other' as const, overVfe: false }));
+    base.cells = profile.flaps.map((row) => ({ label: row.label, state: 'other' as const }));
   }
 
   if (link !== 'waiting') {

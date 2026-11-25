@@ -74,7 +74,7 @@ The exe is unsigned. Its icon is the same glider as the VR toolbar. The config w
 ```
 core/       pure TypeScript, no DOM/Node: profile model, validation, ballast math, scale/marker math,
             current-flap resolver (index -> percent -> L: var -> "FLAP ?"), display-model builder
-ui/         plain DOM view code (strip, weight indicator, settings editor, app orchestrator)
+ui/         plain DOM view code (strip, weight indicator / manual ballast slider, settings editor, app orchestrator)
 adapters/   DataSource / ProfileStore / Host implementations:
               simulated/  SimulatedSource, ScenarioPlayer, ReplaySource, MemoryProfileStore, dev panel
               electron/   SimConnectSource (main process), FileProfileStore, bridge adapters (IPC)
@@ -89,7 +89,7 @@ The desktop UI talks to three adapter interfaces (data, profiles, and host). The
 Coherent-safe rules, enforced by `npm run lint:coherent` and by compiling the renderer to ES2015 and checking it with es-check: flexbox and absolute positioning only (no grid, `gap`, CSS variables), no `ResizeObserver`, `localStorage`, `fetch`, clipboard, pointer events, `Object.entries`, `padStart`; mouse and touch events only.
 
 ### Profiles in brief
-A profile has N flap rows (any N from 0 up; each row: label, a sim index you type in, and VFE) and exactly N-1 transitions, plus Vs and Vne. Saved speeds are metres per second to two decimal places; the display converts them to whole kt or km/h. With both anchors supplied, the read-only weight indicator interpolates stall and transition speeds between the explicit Light and Heavy loaded weights. Weights outside this interval clamp only the interpolation; absent or stale telemetry leaves the ribbon unavailable in this mode. If either anchor is blank, the manual ballast slider instead uses the original No/Max Ballast speed columns and saved per-profile position, independent of total-weight telemetry. Existing profiles retain their speed columns and legacy fields; no reference weights are guessed. VNE is one speed, saved as `vne_ms`. Validation (inline, with a summary box) requires strictly ascending speeds at both weight endpoints; buckets narrower than 4 kt warn, narrower than 2 kt are errors. The display shows an error/incomplete message instead of misleading data when a profile is not valid.
+A profile has N flap rows (any N from 0 up; each row: label, a sim index you type in) and exactly N-1 transitions, plus Vs and Vne. Saved speeds are metres per second to two decimal places; the display converts them to whole kt or km/h. With both anchors supplied, the read-only weight indicator interpolates stall and transition speeds between the explicit Light and Heavy loaded weights. Weights outside this interval clamp only the interpolation; absent or stale telemetry leaves the ribbon unavailable in this mode. If either anchor is blank, the manual ballast slider instead uses the original No/Max Ballast speed columns and saved per-profile position, independent of total-weight telemetry. Existing profiles retain their speed columns and legacy fields; no reference weights are guessed. VNE is one speed, saved as `vne_ms`. Validation (inline, with a summary box) requires strictly ascending speeds at both weight endpoints; buckets narrower than 4 kt warn, narrower than 2 kt are errors. The display shows an error/incomplete message instead of misleading data when a profile is not valid.
 
 ## Choices and deviations worth knowing
 - Schema ids are `flaphappy.profile/3` and `flaphappy.settings/1`. Files with another schema id are rejected. The optional `weight_kg` object stores `light` and `heavy` loaded masses in kg. Older app versions can read the existing speed data but do not preserve the new weight anchors if they re-save a profile.
@@ -101,8 +101,8 @@ A profile has N flap rows (any N from 0 up; each row: label, a sim index you typ
 - The dev panel, scenarios and fault injection (index missing/out of range, percent only, L: var only, unreadable, stale) exist so the whole fallback chain can be exercised without the sim.
 
 ## Tests
-- `npm test`: 102 unit tests (profile model, validation, ballast and scale math, flap resolver, display model, file store, simulated source, scenarios incl. a 20-minute soak, replay, CLI parsing).
-- `npm run test:ui`: 31 tests in a real browser (display for N = 0/1/2/6/10, states, fallbacks, read-only weight indicator, editor, import errors, dev panel, compact) and in a real Electron window under simulated and replay sources (real files, restart persistence, compact window with no MINI/FULL button, recording).
+- `npm test`: 105 unit tests (profile model, validation, ballast and scale math, flap resolver, display model, file store, simulated source, scenarios incl. a 20-minute soak, replay, CLI parsing).
+- `npm run test:ui`: 32 tests in a real browser (display for N = 0/1/2/6/10, states, fallbacks, read-only weight indicator, editor, import errors, dev panel, compact) and in a real Electron window under simulated and replay sources (real files, restart persistence, compact window with no MINI/FULL button, recording).
 
 ## Only verifiable on Windows with MSFS 2024
 Everything above runs and is tested without the sim. These need a real Windows machine and MSFS:

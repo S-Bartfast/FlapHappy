@@ -9,7 +9,6 @@ export interface Speed {
 export interface FlapPosition {
   label: string;
   handle_index: number | null;
-  vfe_kt?: number | null;
 }
 
 export type CurrentFlapSource = 'index' | 'percent' | 'lvar';
@@ -44,12 +43,11 @@ export interface Profile {
   vne: number | null;
   /** Loaded flying weights for the existing light/heavy speed columns (kg). */
   weight_kg: { light: number | null; heavy: number | null };
-  /** Legacy file fields retained for compatibility, not used to control live weight. */
+  /** Manual ballast settings used only when either loaded-weight anchor is missing. */
   ballast: BallastConfig;
   current_flap: CurrentFlapConfig;
   marker_smoothing_ms: number;
   bank_scaling: 'off';
-  display: { vfe_overlay: boolean };
   source: 'user' | 'preset';
   notes: string;
 }
@@ -100,12 +98,26 @@ export interface Settings {
   ballast_by_profile: Record<string, number>;
   /** How speeds are shown. Profile files are stored in metres per second. */
   units: 'kt' | 'kmh';
+  /** How height above ground is shown. */
+  height: 'ft' | 'm';
+  /** AGL bar ends and the green band, in feet. */
+  agl: { bottom_m: number; top_m: number; low_m: number; high_m: number };
   ui: {
     compact: boolean;
     always_on_top: boolean;
     opacity: number;
     zoom: number;
     demo_mode: boolean;
+    /** The ballast slider on the display. */
+    show_ballast: boolean;
+    /** The height bar on the display. */
+    show_agl: boolean;
+    /** The transition speeds under the flap row. */
+    show_transitions: boolean;
+    /** The wind speed drawn on the AGL bar. */
+    show_wind: boolean;
+    /** Cylinder shading on the IAS and AGL fills, including the white end line. */
+    bar_shading: boolean;
   };
   window: WindowBounds | null;
 }

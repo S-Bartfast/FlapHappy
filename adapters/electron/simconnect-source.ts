@@ -130,6 +130,8 @@ export class SimConnectSource implements DataSource {
     num('FLAPS HANDLE PERCENT', 'percent over 100');
     num('SIM ON GROUND', 'bool');
     num('TOTAL WEIGHT', 'kilograms');
+    num('PLANE ALT ABOVE GROUND', 'feet');
+    num('AMBIENT WIND VELOCITY', 'knots');
     h.addToDataDefinition(DEF_MAIN, 'TITLE', null, SimConnectDataType.STRING256);
 
     h.subscribeToSystemEvent(EV_PAUSE, 'Pause');
@@ -148,6 +150,8 @@ export class SimConnectSource implements DataSource {
         const pct = r.readFloat64();
         const ground = r.readFloat64();
         const weight = r.readFloat64();
+        const agl = r.readFloat64();
+        const wind = r.readFloat64();
         const title = r.readString256();
         this.lastDataAt = Date.now();
         this.last = {
@@ -160,6 +164,8 @@ export class SimConnectSource implements DataSource {
           flapCount: count,
           flapPercent: pct,
           onGround: ground > 0.5,
+          aglFt: agl,
+          windKt: wind,
           aircraftTitle: title,
           t: Date.now(),
         };

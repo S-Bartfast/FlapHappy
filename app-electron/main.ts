@@ -83,7 +83,7 @@ async function createWindow(compact: boolean): Promise<void> {
   const w = new BrowserWindow({
     title: APP_NAME,
     width: saved ? saved.width : compact ? 640 : 720,
-    height: saved ? saved.height : compact ? 200 : cli.dev ? 760 : 420,
+    height: saved ? saved.height : compact ? 248 : cli.dev ? 760 : 460,
     x: fits && saved ? saved.x : undefined,
     y: fits && saved ? saved.y : undefined,
     minWidth: 320,

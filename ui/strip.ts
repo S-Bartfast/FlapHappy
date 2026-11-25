@@ -1,6 +1,7 @@
 import type { DisplayModel } from '../core/display-model';
 import type { Profile } from '../core/types';
 import { nativeWidth } from '../core/scale';
+import { aglMarkPositions } from '../core/units';
 import { clear, h, setText, toggleClass } from './dom';
 
 export interface StripOptions {
@@ -24,9 +25,17 @@ export class StripView {
   private marker!: HTMLElement;
   private barMsg!: HTMLElement;
   private readout!: HTMLElement;
+  private aglTrack!: HTMLElement;
+  private aglFill!: HTMLElement;
+  private aglMarker!: HTMLElement;
+  private aglMarks: HTMLElement[] = [];
+  private aglReadout!: HTMLElement;
+  private windReadout!: HTMLElement;
+  private aglRow!: HTMLElement;
   private cellsWrap!: HTMLElement;
   private badge!: HTMLElement;
   private tickLabels!: HTMLElement;
+  private tickRow!: HTMLElement;
   private flapsLabel!: HTMLElement;
   private cellEls: HTMLElement[] = [];
   private cellWraps: HTMLElement[] = [];
@@ -63,19 +72,39 @@ export class StripView {
     this.track.appendChild(h('div', { class: 'fh-barread' }, this.readout));
     const iasRow = h('div', { class: 'fh-row fh-ias-row' }, h('div', { class: 'fh-label' }, 'IAS'), this.track);
 
+    this.aglTrack = h('div', { class: 'fh-agltrack' });
+    this.aglFill = h('div', { class: 'fh-aglfill' });
+    this.aglMarker = h('div', { class: 'fh-aglmarker' });
+    this.aglReadout = h('div', { class: 'fh-aglread' }, '--- ft');
+    this.windReadout = h('span', { class: 'fh-aglwindtext' }, '--- kt');
+    this.aglTrack.appendChild(this.aglFill);
+    const markPos = aglMarkPositions();
+    for (let i = 0; i < markPos.length; i++) {
+      const mark = h('div', { class: 'fh-aglmark' }, h('div', { class: 'fh-aglline' }));
+      if (markPos[i] === null) mark.style.display = 'none';
+      else mark.style.left = pct(markPos[i] as number);
+      this.aglMarks.push(mark);
+      this.aglTrack.appendChild(mark);
+    }
+    this.aglTrack.appendChild(this.aglMarker);
+    this.aglTrack.appendChild(h('div', { class: 'fh-aglwind' }, windPuff(), this.windReadout));
+    this.aglTrack.appendChild(h('div', { class: 'fh-barread' }, this.aglReadout));
+    this.aglRow = h('div', { class: 'fh-row fh-agl-row' }, h('div', { class: 'fh-label' }, 'AGL'), this.aglTrack);
+
     this.cellsWrap = h('div', { class: 'fh-cells' });
     this.badge = h('div', { class: 'fh-badge' });
     this.flapsLabel = h('div', { class: 'fh-label fh-flaps-label' }, 'FLAPS', this.badge);
     const flapsRow = h('div', { class: 'fh-row fh-flaps-row' }, this.flapsLabel, this.cellsWrap);
 
     this.tickLabels = h('div', { class: 'fh-ticklabels' });
-    const tickRow = h('div', { class: 'fh-row fh-tick-row' }, h('div', { class: 'fh-label' }), this.tickLabels);
+    this.tickRow = h('div', { class: 'fh-row fh-tick-row' }, h('div', { class: 'fh-label' }), this.tickLabels);
 
     clear(this.panel);
     this.panel.appendChild(iasRow);
     this.panel.appendChild(flapsRow);
-    this.panel.appendChild(tickRow);
+    this.panel.appendChild(this.tickRow);
     if (this.opts.weightRow) this.panel.appendChild(this.opts.weightRow);
+    this.panel.appendChild(this.aglRow);
   }
 
   /** Rebuild cell/tick elements only when the layout signature changes. */
@@ -126,7 +155,7 @@ export class StripView {
     this.panel.style.width = this.native + 'px';
   }
 
-  render(model: DisplayModel, extra: { profile: Profile | null; zoom?: number }): void {
+  render(model: DisplayModel, extra: { profile: Profile | null; zoom?: number; showBallast?: boolean; showAgl?: boolean; showTransitions?: boolean; showWind?: boolean; barShading?: boolean }): void {
     this.ensureStructure(model);
     const n = model.cells.length;
     const edges = model.edges;
@@ -145,10 +174,10 @@ export class StripView {
     this.cellEls.forEach((c, i) => {
       const cell = model.cells[i];
       toggleClass(c, 'current', cell.state === 'current');
-      toggleClass(c, 'over-vfe', cell.overVfe);
     });
 
     toggleClass(this.panel, 'fh-nobar', !model.barVisible);
+    toggleClass(this.panel, 'fh-noshade', extra.barShading === false);
     this.tickLines.forEach((t, i) => {
       const pos = model.edges && model.ticks ? model.edges[i] : 0;
       t.style.left = pct(pos);
@@ -179,6 +208,31 @@ export class StripView {
 
     setText(this.readout, model.iasText);
     toggleClass(this.readout, 'dim', model.link !== 'live');
+    setText(this.aglReadout, model.aglText);
+    toggleClass(this.aglReadout, 'dim', model.link !== 'live');
+    setText(this.windReadout, model.windText);
+    const windBox = this.windReadout.parentNode as HTMLElement;
+    toggleClass(windBox, 'dim', model.link !== 'live');
+    windBox.style.display = extra.showWind === false ? 'none' : '';
+    toggleClass(this.aglTrack, 'grey', model.link !== 'live');
+    if (model.aglPos !== null) {
+      this.aglFill.style.width = pct(model.aglPos);
+      this.aglFill.style.display = 'block';
+      this.aglMarker.style.display = 'block';
+      this.aglMarker.style.left = pct(model.aglPos);
+    } else {
+      this.aglFill.style.display = 'none';
+      this.aglMarker.style.display = 'none';
+    }
+    toggleClass(this.aglFill, 'inband', model.aglInBand);
+    for (let i = 0; i < this.aglMarks.length; i++) {
+      const pos = model.aglMarkPos[i];
+      if (pos === null || pos === undefined) this.aglMarks[i].style.display = 'none';
+      else {
+        this.aglMarks[i].style.display = 'block';
+        this.aglMarks[i].style.left = pct(pos);
+      }
+    }
     toggleClass(this.readout, 'low', model.alert === 'LOW');
     toggleClass(this.readout, 'fast', model.alert === 'FAST');
 
@@ -190,6 +244,9 @@ export class StripView {
       this.badge.className = 'fh-badge';
     }
     toggleClass(this.cellsWrap, 'grey', model.mode === 'noflaps');
+    if (this.opts.weightRow) this.opts.weightRow.style.display = extra.showBallast === false ? 'none' : '';
+    this.aglRow.style.display = extra.showAgl === false ? 'none' : '';
+    this.tickRow.style.display = extra.showTransitions === true ? '' : 'none';
     this.rescale(extra.zoom);
   }
 
@@ -212,6 +269,27 @@ function equalEdges(cols: number): number[] {
 
 function pct(x: number): string {
   return (Math.round(x * 10000) / 100).toFixed(2) + '%';
+}
+
+/** Three gusts with a curl at the end, drawn in the wind readout's colour. */
+function windPuff(): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('class', 'fh-windicon');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  const lines = ['M9.8 4.4A2 2 0 1 1 11 8H2', 'M17.5 8a2.5 2.5 0 1 1 2 4H2', 'M12.8 19.6A2 2 0 1 0 14 16H2'];
+  for (let i = 0; i < lines.length; i++) {
+    const gust = document.createElementNS(ns, 'path');
+    gust.setAttribute('fill', 'none');
+    gust.setAttribute('stroke', 'currentColor');
+    gust.setAttribute('stroke-width', '2');
+    gust.setAttribute('stroke-linecap', 'round');
+    gust.setAttribute('stroke-linejoin', 'round');
+    gust.setAttribute('d', lines[i]);
+    svg.appendChild(gust);
+  }
+  return svg;
 }
 
 export { clear, setText };
