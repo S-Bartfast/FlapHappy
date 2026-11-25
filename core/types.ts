@@ -111,6 +111,7 @@ export interface Settings {
     show_agl: boolean;
     /** The transition speeds under the flap row. */
     show_transitions: boolean;
+    group_hidden_flap_labels: boolean;
     /** The wind speed drawn on the AGL bar. */
     show_wind: boolean;
     /** Cylinder shading on the IAS and AGL fills, including the white end line. */

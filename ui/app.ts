@@ -400,6 +400,12 @@ export class App {
     this.renderAll();
   }
 
+  setGroupHiddenFlapLabels(on: boolean): void {
+    this.settings.ui.group_hidden_flap_labels = on;
+    this.persistSoon();
+    this.renderAll();
+  }
+
   setShowTransitions(on: boolean): void {
     this.settings.ui.show_transitions = on;
     this.persistSoon();
@@ -494,6 +500,7 @@ export class App {
       units: this.settings.units,
       height: this.settings.height,
       agl: this.settings.agl,
+      groupHiddenFlapLabels: this.settings.ui.group_hidden_flap_labels,
     });
   }
 
@@ -533,6 +540,7 @@ export class App {
       showBallast: this.settings.ui.show_ballast,
       showAgl: this.settings.ui.show_agl,
       showTransitions: this.settings.ui.show_transitions,
+      groupHiddenFlapLabels: this.settings.ui.group_hidden_flap_labels,
       showWind: this.settings.ui.show_wind,
       barShading: this.settings.ui.bar_shading,
     };

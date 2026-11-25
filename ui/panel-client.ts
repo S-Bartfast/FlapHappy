@@ -67,6 +67,7 @@ function paint(state: CockpitState): void {
     units: state.units === 'kmh' ? 'kmh' : 'kt',
     height: state.height === 'm' ? 'm' : 'ft',
     agl: aglFromState(state),
+    groupHiddenFlapLabels: state.groupHiddenFlapLabels === true,
   });
   strip.render(model, { profile, zoom: state.zoom, showBallast: state.showBallast !== false, showAgl: state.showAgl !== false, showTransitions: state.showTransitions === true, showWind: state.showWind !== false, barShading: state.barShading !== false });
   if (!holding && state.ballast !== shownBallast) {

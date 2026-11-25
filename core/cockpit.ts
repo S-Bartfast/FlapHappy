@@ -16,6 +16,7 @@ export interface CockpitState {
   zoom: number;
   showBallast: boolean;
   showAgl: boolean;
+  groupHiddenFlapLabels?: boolean;
   showTransitions: boolean;
   showWind: boolean;
   /** Cylinder shading on the IAS and AGL fills. Missing means on. */

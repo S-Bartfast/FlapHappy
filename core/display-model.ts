@@ -72,6 +72,8 @@ export interface ModelInput {
   flap: CurrentFlap;
   /** Display unit. The profile's working speeds are knots. */
   units?: SpeedUnit;
+  /** Merge label text only; physical groups and trigger geometry always stay intact. */
+  groupHiddenFlapLabels?: boolean;
   /** Height unit for the AGL bar. */
   height?: HeightUnit;
   /** AGL bar ends and the green band, in feet. */
@@ -146,11 +148,11 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
     const current = live || link === 'paused' || link === 'nodata' ? flap.rowIndex : null;
     const group=current===null?-1:groups.members.findIndex(m=>m.includes(current));
     base.currentRow=group<0?null:group;
-    base.cells=groups.labels.map((label,i)=>({label,state:base.currentRow===i?'current':'other'}));
+    base.cells=groups.labels.map((label,i)=>({label:inp.groupHiddenFlapLabels===true?label:profile.flaps[groups.members[i][groups.members[i].length-1]].label,state:base.currentRow===i?'current':'other'}));
     if(base.currentRow!==null&&groups.members[base.currentRow].length>1&&flap.label)
       base.badge={kind:'mapped',text:flap.label};
   } else if (n > 0) {
-    base.cells=groups.labels.map(label=>({label,state:'other'}));
+    base.cells=groups.labels.map((label,i)=>({label:inp.groupHiddenFlapLabels===true?label:profile.flaps[groups.members[i][groups.members[i].length-1]].label,state:'other'}));
   }
 
   if (link !== 'waiting') {

@@ -117,3 +117,5 @@ Everything above runs and is tested without the sim. These need a real Windows m
 
 ### Merged flap bands
 In Settings, check **Merge adjoining flap bands (exclude divider)** for a transition to omit that speed divider and merge its two adjacent flap labels. Consecutive exclusions form a single band. The actual simulator handle and its exact label are preserved. The optional exclusion is saved with each transition; legacy profiles remain unchanged, and excluded transition speeds are not needed until the divider is shown again.
+
+**Group hidden flap labels** (Display, off by default) controls the label text for adjacent flap detents with a hidden divider. Off displays the surviving last label (e.g. `5`); On displays all labels (e.g. `L-6-5`). Divider positions, exact handle mapping and recommendation groups remain the same. The setting is shared by the desktop and in-sim display.
