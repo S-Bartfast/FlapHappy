@@ -8,6 +8,8 @@ export interface CockpitState {
   sample: SimSample | null;
   /** When the desktop app last received `sample`, in ms. */
   receivedAt: number;
+  /** Manual ballast fraction (ignored for profiles with valid loaded-weight anchors). */
+  ballast: number;
   units: 'kt' | 'kmh';
   zoom: number;
 }

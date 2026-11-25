@@ -2,7 +2,7 @@ import type { Profile, ValidationResult } from './types';
 import type { SimSample } from './sim';
 import type { CurrentFlap } from './flapmap';
 import { columnEdges, effectiveBoundaries, mapMarker, type MarkerRegion } from './scale';
-import { liveWeight, type WeightState } from './weight';
+import { interpolationFraction, liveWeight, type WeightState } from './weight';
 import { formatIas, formatTick, type SpeedUnit } from './units';
 
 export type LinkState = 'waiting' | 'nodata' | 'paused' | 'live';
@@ -56,6 +56,8 @@ export interface ModelInput {
   validation: ValidationResult | null;
   sample: SimSample | null;
   link: LinkState;
+  /** Stored manual fraction, used only when the loaded-weight anchors are incomplete. */
+  manualBallast?: number;
   /** IAS after display smoothing (falls back to the raw sample when null). */
   ias: number | null;
   flap: CurrentFlap;
@@ -104,11 +106,11 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
   if (live && shown !== null && isFinite(shown)) base.iasText = formatIas(shown, units);
 
   const n = profile.flaps.length;
-  const boundaries = validation.ok && weight.fraction !== null ? effectiveBoundaries(profile, weight.fraction) : null;
+  const fraction = interpolationFraction(profile, weight, inp.manualBallast);
+  const boundaries = validation.ok && fraction !== null ? effectiveBoundaries(profile, fraction) : null;
   base.mode = n === 0 ? 'noflaps' : validation.ok ? 'ok' : 'incomplete';
   if (base.mode === 'incomplete') base.incompleteMessage = 'profile incomplete: open settings';
-  else if (!weight.anchorsValid) base.incompleteMessage = 'Set Light and Heavy flying weights in settings';
-  else if (weight.kg === null) base.incompleteMessage = 'Flying weight unavailable';
+  else if (weight.anchorsValid && weight.kg === null) base.incompleteMessage = 'Flying weight unavailable';
 
   // Flap cells: one per row.
   if (n > 0 && validation.structureOk) {

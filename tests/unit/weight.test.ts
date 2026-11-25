@@ -41,4 +41,26 @@ describe('loaded flying weight', () => {
     expect(build(null, 'live').barVisible).toBe(false);
     expect(build(500, 'nodata').barVisible).toBe(false);
   });
+  it('uses manual ballast only for profiles without both weight anchors', () => {
+    const build = (profile: ReturnType<typeof makeProfile>, link: 'live' | 'nodata', kg: number | null, manualBallast: number) => {
+      const s = sample({ totalWeightKg: kg });
+      return buildDisplayModel({ profile, validation: validateProfile(profile), sample: s, link, ias: s.iasKt,
+        flap: new CurrentFlapResolver().resolve(profile, s, 1000), manualBallast });
+    };
+    for (const anchors of [{light: null, heavy: null}, {light: 400, heavy: null}, {light: null, heavy: 600}]) {
+      const legacy = makeProfile(2);
+      legacy.weight_kg = anchors;
+      expect(validateProfile(legacy).ok).toBe(true);
+      expect(build(legacy, 'live', 800, 0.5).boundaries).toEqual([45, 59, 82]);
+      expect(build(legacy, 'nodata', null, 0.5).boundaries).toEqual([45, 59, 82]);
+      expect(build(legacy, 'nodata', null, 0.5).marker.pos).toBeNull();
+    }
+    expect(build(p, 'live', 400, 1).boundaries).toEqual([40, 52, 82]);
+    expect(build(p, 'nodata', 600, 1).boundaries).toBeNull();
+    expect(build(p, 'live', null, 1).boundaries).toBeNull();
+    const invalid = makeProfile(2); invalid.weight_kg = { light: 600, heavy: 400 };
+    expect(validateProfile(invalid).ok).toBe(false);
+    expect(build(invalid, 'live', 500, 0.5).barVisible).toBe(false);
+  });
+
 });

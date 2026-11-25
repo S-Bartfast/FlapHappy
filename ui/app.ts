@@ -4,16 +4,17 @@ import type { Profile, ProfileMeta, Settings, ValidationResult } from '../core/t
 import { validateProfile } from '../core/validate';
 import { CurrentFlapResolver, type CurrentFlap } from '../core/flapmap';
 import { buildDisplayModel, deriveLink, type DisplayModel } from '../core/display-model';
-import { liveWeight, validWeightAnchors } from '../core/weight';
+import { interpolationFraction, liveWeight, usesManualBallast, validWeightAnchors } from '../core/weight';
+import { initialBallast, type BallastState } from '../core/ballast';
 import { selectProfileId } from '../core/select';
 import { effectiveBoundaries, smoothStep } from '../core/scale';
-import { cloneProfile, exportProfileJson, parseProfileJson, profileLabel } from '../core/profile';
+import { clamp01, cloneProfile, exportProfileJson, parseProfileJson, profileLabel } from '../core/profile';
 import { defaultSettings } from '../core/settings';
 import { SimulatedSource } from '../adapters/simulated/simulated-source';
 import { PRESETS } from '../profiles';
 import { clear, h, setText, toggleClass } from './dom';
 import { StripView } from './strip';
-import { WeightIndicator } from './slider';
+import { WeightControl } from './slider';
 import { SettingsView, type ImportDraft } from './settings';
 
 export interface AppDeps {
@@ -36,6 +37,7 @@ export class App {
   metas: ProfileMeta[] = [];
   profile: Profile | null = null;
   validation: ValidationResult | null = null;
+  ballast: BallastState = { f: 0, unconfirmed: true, restored: false };
   lastSample: SimSample | null = null;
   lastRx = 0;
   flap: CurrentFlap = { status: 'unknown', rowIndex: null, label: null, handleIndex: null, via: null };
@@ -47,7 +49,7 @@ export class App {
   private smoothIas: number | null = null;
   private smoothAt = 0;
   private strip!: StripView;
-  private slider!: WeightIndicator;
+  private slider!: WeightControl;
   private displayView!: HTMLElement;
   private statusEl!: HTMLElement;
   private titleEl!: HTMLElement;
@@ -113,6 +115,10 @@ export class App {
     this.usingSim = this.deps.info.source === 'simulated' || this.settings.ui.demo_mode || !this.deps.realSource;
     this.startSource();
     this.applyHostSettings();
+    window.flapHappyBridge?.on('panel:ballast', (value) => {
+      const change = value as { profileId?: string; f?: number };
+      if (change?.profileId === this.profile?.id && typeof change.f === 'number') this.setManualBallast(change.f, true);
+    });
     setInterval(() => this.renderAll(), 500);
     if (!this.profile) this.openSettings();
   }
@@ -124,7 +130,7 @@ export class App {
     clear(root);
     root.className = 'fh-root' + (this.deps.compact ? ' fh-compact' : '');
 
-    this.slider = new WeightIndicator();
+    this.slider = new WeightControl((f) => this.setManualBallast(f, true));
     this.strip = new StripView({ weightRow: this.slider.el });
     this.titleEl = h('div', { class: 'fh-title' }, 'Flap Happy');
     this.statusEl = h('div', { class: 'fh-status' });
@@ -303,12 +309,14 @@ export class App {
   }
 
   /** Apply a profile to the live display. Invalid drafts do not replace a valid profile of the same id. */
-  setActiveProfile(p: Profile, _restoreBallast: boolean): boolean {
+  setActiveProfile(p: Profile, restoreBallast: boolean): boolean {
     const v = validateProfile(p, { liveHandleCount: this.liveCount() });
     const prevValid = this.profile && this.validation && this.validation.ok;
     if (!v.ok && prevValid && this.profile && this.profile.id === p.id) return false;
+    const changed = !this.profile || this.profile.id !== p.id || usesManualBallast(this.profile) !== usesManualBallast(p);
     this.profile = p;
     this.validation = v;
+    if (changed || restoreBallast) this.ballast = initialBallast(p, this.settings.ballast_by_profile[p.id]);
     this.resolver.reset();
     this.syncSimToProfile();
     if (this.deps.realSource && !this.usingSim) this.deps.realSource.setLvarName?.(p.current_flap.lvar_name);
@@ -327,17 +335,28 @@ export class App {
     this.renderAll();
   }
 
-  /** Legacy demo scenarios use a synthetic fraction; never affect the live source. */
-  setBallast(f: number, _touched: boolean): void {
+  setManualBallast(f: number, touched: boolean): void {
+    if (!usesManualBallast(this.profile) || !this.profile || !isFinite(f)) return;
+    this.ballast = { f: clamp01(f), unconfirmed: touched ? false : this.ballast.unconfirmed, restored: touched ? false : this.ballast.restored };
+    this.settings.ballast_by_profile[this.profile.id] = this.ballast.f;
+    this.persistSoon();
+    this.renderAll();
+  }
+
+  /** Demo scenarios may synthesize weight for an anchored profile; never affect live telemetry. */
+  setBallast(f: number, touched: boolean): void {
     const p = this.profile;
-    if (!this.usingSim || !p || !validWeightAnchors(p) || !isFinite(f)) return;
+    if (!p || !isFinite(f)) return;
+    if (usesManualBallast(p)) { this.setManualBallast(f, touched); return; }
+    if (!this.usingSim || !validWeightAnchors(p)) return;
     this.sim.controls.totalWeightKg = p.weight_kg.light! + Math.max(0, Math.min(1, f)) * (p.weight_kg.heavy! - p.weight_kg.light!);
     this.sim.tick(0);
   }
 
   currentBoundaries(): number[] | null {
     const w = liveWeight(this.profile, this.lastSample, deriveLink(this.lastSample, this.lastRx, Date.now()) === 'live');
-    return this.profile && this.validation?.ok && w.fraction !== null ? effectiveBoundaries(this.profile, w.fraction) : null;
+    const fraction = interpolationFraction(this.profile, w, this.ballast.f);
+    return this.profile && this.validation?.ok && fraction !== null ? effectiveBoundaries(this.profile, fraction) : null;
   }
 
   // ------------------------------------------------------------------ Window
@@ -430,6 +449,7 @@ export class App {
       validation,
       sample: this.lastSample,
       link,
+      manualBallast: this.ballast.f,
       ias: this.smoothIas,
       flap,
       units: this.settings.units,
@@ -440,8 +460,8 @@ export class App {
     if (!this.strip) return;
     const model = this.buildModelFor(this.profile, this.validation);
     this.lastModel = model;
+    this.slider.render(this.profile, model.weight, this.ballast);
     this.strip.render(model, { profile: this.profile, zoom: this.settings.ui.zoom });
-    this.slider.render(model.weight);
     setText(this.titleEl, this.profile ? profileLabel(this.profile.id) : 'Flap Happy');
     const bits: string[] = [];
     if (model.statusText) bits.push(model.statusText);
@@ -464,6 +484,7 @@ export class App {
       profile: this.profile,
       sample: this.lastSample,
       receivedAt: this.lastRx,
+      ballast: this.ballast.f,
       units: this.settings.units === 'kmh' ? 'kmh' : 'kt',
       zoom: this.settings.ui.zoom,
     };

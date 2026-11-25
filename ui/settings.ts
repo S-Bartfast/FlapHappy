@@ -236,10 +236,10 @@ export class SettingsView {
         'div',
         { class: 'fh-erow fh-speedrow ' + cls },
         nameEl ?? h('div', { class: 'fh-rowname' }, title),
-        h('label', { class: 'fh-sub' }, 'Light'),
-        this.fieldInput(path + '.no_ballast_kt', formatSpeedField(s.no_ballast_kt, unit), { cls: 'fh-speed', step: '1', onInput: (t) => { get().no_ballast_kt = storeSpeed(t); }, label: title + ' Light weight' }),
-        h('label', { class: 'fh-sub' }, 'Heavy'),
-        this.fieldInput(path + '.max_ballast_kt', formatSpeedField(s.max_ballast_kt, unit), { cls: 'fh-speed', step: '1', placeholder: isEnd ? 'same' : '', onInput: (t) => { get().max_ballast_kt = storeSpeed(t); }, label: title + ' Heavy weight' }),
+        h('label', { class: 'fh-sub' }, 'Light / None'),
+        this.fieldInput(path + '.no_ballast_kt', formatSpeedField(s.no_ballast_kt, unit), { cls: 'fh-speed', step: '1', onInput: (t) => { get().no_ballast_kt = storeSpeed(t); }, label: title + ' Light weight / No Ballast' }),
+        h('label', { class: 'fh-sub' }, 'Heavy / Max'),
+        this.fieldInput(path + '.max_ballast_kt', formatSpeedField(s.max_ballast_kt, unit), { cls: 'fh-speed', step: '1', placeholder: isEnd ? 'same' : '', onInput: (t) => { get().max_ballast_kt = storeSpeed(t); }, label: title + ' Heavy weight / Max Ballast' }),
         h('span', { class: 'fh-unit' }, unitLabel(unit)),
       );
     };
@@ -250,7 +250,7 @@ export class SettingsView {
       this.fieldInput('weight_kg.light', fmtNum(d.weight_kg.light), { cls: 'fh-speed', step: '1', label: 'Light flying weight (kg)', onInput: (t) => { d.weight_kg.light = numberOrNull(t); } }),
       h('label', { class: 'fh-sub' }, 'Heavy'),
       this.fieldInput('weight_kg.heavy', fmtNum(d.weight_kg.heavy), { cls: 'fh-speed', step: '1', label: 'Heavy flying weight (kg)', onInput: (t) => { d.weight_kg.heavy = numberOrNull(t); } })));
-    this.table.appendChild(h('div', { class: 'fh-hint' }, 'Enter the loaded weights that the Light/Heavy speeds correspond to; Heavy must exceed Light.'));
+    this.table.appendChild(h('div', { class: 'fh-hint' }, 'Optional: enter both loaded weights for automatic interpolation; otherwise the manual ballast slider uses the No/Max Ballast speeds.'));
     this.table.appendChild(speedRow('Min (stall)', 'fh-minrow', null, () => d.vs_min, 'vs_min', true));
 
     d.flaps.forEach((row, i) => {
@@ -473,6 +473,10 @@ export class SettingsView {
       h('div', { class: 'fh-subtitle' }, 'Display'),
       num('Marker smoothing (ms, 0 = off)', () => d.marker_smoothing_ms, (v) => { d.marker_smoothing_ms = Math.max(0, v ?? 0); }, '50'),
       check('Red text when the current flap is above its VFE', () => d.display.vfe_overlay, (v) => { d.display.vfe_overlay = v; }),
+      h('div', { class: 'fh-subtitle' }, 'Manual ballast fallback (profiles without both flying weights)'),
+      h('div', { class: 'fh-arow' }, h('label', null, 'Default ballast'), h('input', { class: 'fh-in', type: 'number', min: '0', max: '100', step: '5', value: String(Math.round(d.ballast.default_fraction * 100)), oninput: (e: Event) => { const v = numberOrNull((e.target as HTMLInputElement).value); d.ballast.default_fraction = Math.max(0, Math.min(100, v ?? 0)) / 100; this.edited(false); } }), h('span', { class: 'fh-pct' }, '%')),
+      h('div', { class: 'fh-arow' }, h('label', null, 'Drag snap'), h('input', { class: 'fh-in', type: 'number', min: '0', max: '100', step: '1', value: String(Math.round(d.ballast.drag_snap * 100)), oninput: (e: Event) => { const v = numberOrNull((e.target as HTMLInputElement).value); d.ballast.drag_snap = Math.max(0, Math.min(100, v ?? 0)) / 100; this.edited(false); } }), h('span', { class: 'fh-pct' }, '%')),
+      num('Max ballast (litres, optional)', () => d.ballast.max_ballast_litres, (v) => { d.ballast.max_ballast_litres = v; }, '1', 'blank = do not show'),
       h('div', { class: 'fh-subtitle' }, 'Aircraft'),
       text('Match aircraft title containing (comma separated)', () => d.match.title_contains.join(', '), (v) => { d.match.title_contains = v.split(',').map((x) => x.trim()).filter(Boolean); }, 'e.g. AS 33'),
       text('Notes', () => d.notes, (v) => { d.notes = v; }),

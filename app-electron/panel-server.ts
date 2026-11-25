@@ -2,6 +2,7 @@ import { createServer, type Server } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import type { CockpitState } from '../core/cockpit';
+import { usesManualBallast } from '../core/weight';
 import { COCKPIT_PORT } from '../core/cockpit';
 
 const types: Record<string, string> = {
@@ -14,16 +15,18 @@ const types: Record<string, string> = {
 
 /**
  * Local page the in-sim panel loads. Bound to 127.0.0.1 only.
- * The desktop app publishes the live profile and sim sample; the panel is read-only.
+ * The desktop app publishes the live profile and sim sample. Only legacy
+ * profiles permit manual ballast changes from the panel.
  */
 export function startPanelServer(opts: {
   root: string;
   version: string;
   getState: () => CockpitState | null;
+  onBallast: (profileId: string, f: number) => void;
 }): Promise<Server> {
   const server = createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
@@ -36,7 +39,32 @@ export function startPanelServer(opts: {
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/state') {
-      json(res, 200, opts.getState() ?? { ready: false, profile: null, sample: null, receivedAt: 0, units: 'kt', zoom: 1 });
+      json(res, 200, opts.getState() ?? { ready: false, profile: null, sample: null, receivedAt: 0, ballast: 0, units: 'kt', zoom: 1 });
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/ballast') {
+      const initial = opts.getState();
+      if (!initial?.ready || !initial.profile || !usesManualBallast(initial.profile)) {
+        req.resume();
+        json(res, 405, { ok: false });
+        return;
+      }
+      let body: { profileId?: unknown; f?: unknown } | null = null;
+      try {
+        body = JSON.parse(await readBody(req));
+      } catch { /* malformed or oversized input */ }
+      if (!body || typeof body.profileId !== 'string' || typeof body.f !== 'number' || !isFinite(body.f)) {
+        json(res, 400, { ok: false });
+        return;
+      }
+      const current = opts.getState();
+      if (!current?.ready || !current.profile || current.profile.id !== body.profileId ||
+          current.profile.id !== initial.profile.id || !usesManualBallast(current.profile)) {
+        json(res, 409, { ok: false });
+        return;
+      }
+      opts.onBallast(body.profileId, Math.max(0, Math.min(1, body.f)));
+      json(res, 200, { ok: true });
       return;
     }
     if (req.method !== 'GET') {
@@ -64,4 +92,15 @@ function json(res: import('node:http').ServerResponse, status: number, body: unk
   const text = JSON.stringify(body);
   res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
   res.end(text);
+}
+
+function readBody(req: import('node:http').IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on('data', (c: Buffer) => { size += c.length; if (size <= 4096) chunks.push(c); });
+    req.on('end', () => size <= 4096 ? resolve(Buffer.concat(chunks).toString('utf8')) : reject(new Error('Body too large')));
+    req.on('error', reject);
+    req.on('aborted', () => reject(new Error('Body aborted')));
+  });
 }

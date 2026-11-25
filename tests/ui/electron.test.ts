@@ -127,7 +127,7 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
           await view.waitForFunction(text => document.querySelector('.fh-sl-pct')?.textContent === text, expected);
           const visibleTicks = await view.$$eval('.fh-ticktext', els => els.filter(x => getComputedStyle(x).display !== 'none').map(x => x.textContent));
           expect(visibleTicks).toEqual(ticks);
-          expect(await view.locator('.fh-weight-row input, .fh-weight-row button').count()).toBe(0);
+          expect(await view.locator('.fh-weight-row input, .fh-weight-row button, .fh-ballast-row').count()).toBe(0);
         }
       };
       await verify(300, ['40','52','82']);
@@ -146,6 +146,68 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
         await view.waitForFunction(() => document.querySelector('.fh-sl-pct')?.textContent === '-- kg');
         expect(await view.locator('.fh-ticktext:visible').count()).toBe(0);
       }
+    } finally {
+      await browser?.close();
+      await app.close();
+      fs.rmSync(ud, { recursive: true, force: true });
+    }
+  });
+
+  it('restores the original manual slider for legacy profiles in both windows and persists the selected fraction', async () => {
+    const ud = fs.mkdtempSync(path.join(os.tmpdir(), 'flaphappy-legacy-weight-'));
+    const legacy = makeProfile(2, { id: 'legacy-fixture' });
+    legacy.weight_kg = { light: null, heavy: null };
+    legacy.ballast.default_fraction = 0.25;
+    legacy.ballast.max_ballast_litres = 200;
+    fs.mkdirSync(path.join(ud, 'profiles'));
+    const file = JSON.parse(exportProfileJson(legacy));
+    delete file.weight_kg;
+    fs.writeFileSync(path.join(ud, 'profiles', legacy.id + '.json'), JSON.stringify(file));
+    fs.writeFileSync(path.join(ud, 'settings.json'), JSON.stringify({ schema: 'flaphappy.settings/1', last_profile_id: legacy.id, active_by_title: { 'Simulated glider': legacy.id } }));
+    let { app, page } = await launch(ud);
+    let browser: import('playwright-core').Browser | undefined;
+    try {
+      const { chromium } = await import('playwright-core');
+      const executablePath = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', '/usr/bin/chromium', '/usr/bin/google-chrome'].find(p => p && fs.existsSync(p));
+      browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
+      const panel = await browser.newPage();
+      const panelUrl = 'http://127.0.0.1:47321';
+      await panel.goto(panelUrl + '/panel.html');
+      const read = async (view: Page, pct: string, ticks: string[]) => {
+        await view.waitForFunction(({ text, expected }) => document.querySelector('.fh-ballast-row .fh-sl-pct')?.textContent === text &&
+          Array.from(document.querySelectorAll('.fh-ticktext')).filter(x => getComputedStyle(x).display !== 'none').map(x => x.textContent).join(',') === expected.join(','), { text: pct, expected: ticks }, { timeout: 5000 });
+        expect(await view.locator('.fh-weight-row').count()).toBe(0);
+        expect(await view.$$eval('.fh-ticktext:visible', els => els.map(x => x.textContent))).toEqual(ticks);
+      };
+      for (const view of [page, panel]) await read(view, '25% 50 L', ['43', '56', '82']);
+      const click = async (view: Page, f: number) => {
+        const track = view.locator('.fh-ballast-row .fh-sl-track');
+        const r = (await track.boundingBox())!;
+        await view.bringToFront();
+        await view.mouse.click(r.x + r.width * f, r.y + r.height / 2);
+      };
+      await click(panel, 0.75);
+      for (const view of [page, panel]) await read(view, '75% 150 L', ['48', '63', '82']);
+      // A two-flap strip is taller than the old 200 px compact window at this width.
+      // Resize the actual Electron window, just as a pilot can, before clicking.
+      await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(640, 320));
+      await page.waitForFunction(() => window.innerHeight >= 300);
+      await click(page, 0.5);
+      for (const view of [page, panel]) await read(view, '50% 100 L', ['45', '59', '82']);
+      expect((await fetch(panelUrl + '/api/ballast', { method: 'POST', body: JSON.stringify({ profileId: 'wrong-profile', f: 0 }) })).status).toBe(409);
+      await page.evaluate(() => { const sim = (window as any).__flapHappy.sim; sim.controls.totalWeightKg = 800; sim.tick(0); });
+      for (const view of [page, panel]) await read(view, '50% 100 L', ['45', '59', '82']);
+      await page.waitForTimeout(650);
+      expect(JSON.parse(fs.readFileSync(path.join(ud, 'settings.json'), 'utf8')).ballast_by_profile[legacy.id]).toBe(0.5);
+      await browser.close(); browser = undefined;
+      await app.close();
+      ({ app, page } = await launch(ud));
+      await read(page, '50% 100 L', ['45', '59', '82']);
+      await page.evaluate((p) => { const a = (window as any).__flapHappy.app; a.setActiveProfile(p, true); }, makeProfile(2, { id: legacy.id }));
+      await page.waitForSelector('.fh-weight-row');
+      expect(await page.locator('.fh-ballast-row').count()).toBe(0);
+      await page.evaluate((p) => { const a = (window as any).__flapHappy.app; a.setActiveProfile(p, true); }, legacy);
+      await read(page, '50% 100 L', ['45', '59', '82']);
     } finally {
       await browser?.close();
       await app.close();

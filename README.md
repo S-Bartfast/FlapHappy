@@ -1,6 +1,6 @@
 # Flap Happy
 
-A compact window for MSFS 2024 gliders, and the same display inside the sim, including VR. It shows the current indicated airspeed (IAS) on a segmented bar, where each segment is one flap setting's speed range, plus the current flap position, so you can see at a glance which flap you should be in. Live total flying weight shifts the speeds automatically; the weight indicator is read-only. Press **PIN** to keep the desktop window above other programs.
+A compact window for MSFS 2024 gliders, and the same display inside the sim, including VR. It shows the current indicated airspeed (IAS) on a segmented bar, where each segment is one flap setting's speed range, plus the current flap position, so you can see at a glance which flap you should be in. For profiles with both loaded reference weights, live total flying weight shifts the speeds automatically and the weight indicator is read-only. Profiles without both weights retain the original manual ballast slider. Press **PIN** to keep the desktop window above other programs.
 
 The desktop app is Electron with `node-simconnect`. It owns the sim connection and serves the cockpit panel. The display is plain HTML/JS/CSS in a conservative subset so the sim's browser can run it.
 
@@ -22,11 +22,11 @@ With MSFS 2024: start the sim first or after, either works. Flap Happy reconnect
 ### First use
 1. Click the cog (top right) to open the settings.
 2. A new install, or an empty profile folder, gets **AS33-18m**, **AS33-15m**, and **JS3**. AS33-18m opens first. Profiles already in the folder are not copied again.
-3. Enter the loaded Light and Heavy reference weights (kg) for the two speed columns then save the profile. MSFS supplies actual weight. Legacy profiles have blank anchors until you enter verified values.
+3. Optionally enter both loaded Light and Heavy reference weights (kg) for the two speed columns then save the profile. MSFS supplies actual weight. Leave either anchor blank to keep using the original manual ballast slider, including for existing profiles; its position is saved per profile. A profile with both weights never falls back to manual ballast on missing or stale telemetry.
 
 Your data lives in `%APPDATA%\FlapHappy\`:
 - `profiles\<name>.json`: one file per profile (readable, shareable; drag a `.json` onto the window to import).
-- `settings.json`: window position, zoom, selected profile, etc. Legacy ballast preferences are ignored.
+- `settings.json`: window position, zoom, selected profile, etc. Manual ballast preferences are retained per profile and used only when either weight anchor is absent.
 
 Saving writes a `.bak` next to the file first; deleted profiles are kept as `.deleted.bak`.
 
@@ -89,7 +89,7 @@ The desktop UI talks to three adapter interfaces (data, profiles, and host). The
 Coherent-safe rules, enforced by `npm run lint:coherent` and by compiling the renderer to ES2015 and checking it with es-check: flexbox and absolute positioning only (no grid, `gap`, CSS variables), no `ResizeObserver`, `localStorage`, `fetch`, clipboard, pointer events, `Object.entries`, `padStart`; mouse and touch events only.
 
 ### Profiles in brief
-A profile has N flap rows (any N from 0 up; each row: label, a sim index you type in, and VFE) and exactly N-1 transitions, plus Vs and Vne. Saved speeds are metres per second to two decimal places; the display converts them to whole kt or km/h. The read-only weight indicator interpolates stall and transition speeds between the explicit Light and Heavy loaded weights. Weights outside this interval clamp only the interpolation; absent or stale weights leave the ribbon unavailable. Existing profiles retain their speed columns and legacy fields; no reference weights are guessed. VNE is one speed, saved as `vne_ms`. Validation (inline, with a summary box) requires strictly ascending speeds at both weight endpoints; buckets narrower than 4 kt warn, narrower than 2 kt are errors. The display shows an error/incomplete message instead of misleading data when a profile is not valid.
+A profile has N flap rows (any N from 0 up; each row: label, a sim index you type in, and VFE) and exactly N-1 transitions, plus Vs and Vne. Saved speeds are metres per second to two decimal places; the display converts them to whole kt or km/h. With both anchors supplied, the read-only weight indicator interpolates stall and transition speeds between the explicit Light and Heavy loaded weights. Weights outside this interval clamp only the interpolation; absent or stale telemetry leaves the ribbon unavailable in this mode. If either anchor is blank, the manual ballast slider instead uses the original No/Max Ballast speed columns and saved per-profile position, independent of total-weight telemetry. Existing profiles retain their speed columns and legacy fields; no reference weights are guessed. VNE is one speed, saved as `vne_ms`. Validation (inline, with a summary box) requires strictly ascending speeds at both weight endpoints; buckets narrower than 4 kt warn, narrower than 2 kt are errors. The display shows an error/incomplete message instead of misleading data when a profile is not valid.
 
 ## Choices and deviations worth knowing
 - Schema ids are `flaphappy.profile/3` and `flaphappy.settings/1`. Files with another schema id are rejected. The optional `weight_kg` object stores `light` and `heavy` loaded masses in kg. Older app versions can read the existing speed data but do not preserve the new weight anchors if they re-save a profile.

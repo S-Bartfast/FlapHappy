@@ -28,7 +28,7 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-label { width: 96px; flex: none; font-size: 22px; font-weight: 600; color: #9fb0c3; letter-spacing: 0.5px; }
 .fh-gr { width: 128px; flex: none; padding-left: 12px; }
 .fh-unit { font-size: 20px; color: #6f8196; }
-.fh-weight-row .fh-label { font-size: 17px; letter-spacing: 0; }
+.fh-weight-row .fh-label, .fh-ballast-row .fh-label { font-size: 17px; letter-spacing: 0; }
 
 .fh-track { flex: 1; position: relative; height: 44px; background: #161d28; border-radius: 0; overflow: hidden; border: 1px solid #2a3647; }
 .fh-cols { position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
@@ -68,10 +68,11 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-ticktext { position: absolute; top: 0; font-size: 20px; color: #9fb0c3; -webkit-transform: translateX(-50%); transform: translateX(-50%); -webkit-transition: left 0.15s ease; transition: left 0.15s ease; }
 .fh-ticktext.last { -webkit-transform: translateX(-100%); transform: translateX(-100%); }
 
-.fh-weight-row { margin-top: 6px; }
+.fh-weight-row, .fh-ballast-row { margin-top: 6px; }
 .fh-sl { flex: 1; display: flex; align-items: center; }
 .fh-sl-trackwrap { flex: 1; height: 40px; padding: 0 12px; display: flex; align-items: center; min-width: 40px; }
 .fh-sl-track { position: relative; width: 100%; height: 12px; background: #1d2733; border-radius: 6px; border: 1px solid #3a475a; cursor: default; }
+.fh-ballast-row .fh-sl-track { cursor: pointer; }
 .fh-sl-track:before { content: ""; position: absolute; left: 0; right: 0; top: -14px; bottom: -14px; }
 .fh-sl-fill { position: absolute; left: 0; top: 0; bottom: 0; background: #2f8fd8; border-radius: 6px; }
 .fh-sl-thumb { position: absolute; top: -9px; width: 28px; height: 28px; margin-left: -14px; border-radius: 14px; background: #fff; border: 2px solid #2f8fd8; -webkit-transition: left 0.08s ease; transition: left 0.08s ease; }
