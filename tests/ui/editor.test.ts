@@ -58,7 +58,12 @@ describe('settings editor: build the AS 33 Me table from scratch', () => {
     expect(await validHead(page)).toContain('Not applied: fix');
     await page.screenshot({ path: `${SHOT_DIR}/flaphappy-editor-incomplete.png`, fullPage: true });
 
+    expect(await page.locator('.fh-weight-mode').inputValue()).toBe('manual');
+    expect(await page.locator(fieldSel('weight_kg.light')).count()).toBe(0);
+    await page.selectOption('.fh-weight-mode', 'live');
+    expect(await page.locator('.fh-settings .fh-save').isDisabled()).toBe(true);
     await fill(page, 'weight_kg.light', '400');
+    expect(await page.locator('.fh-settings .fh-save').isDisabled()).toBe(true);
     await fill(page, 'weight_kg.heavy', '600');
     await fill(page, 'vs_min.no_ballast_kt', '48');
     await fill(page, 'vs_min.max_ballast_kt', '56');

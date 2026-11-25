@@ -4,7 +4,7 @@ import type { Profile, ProfileMeta, Settings, ValidationResult } from '../core/t
 import { validateProfile } from '../core/validate';
 import { CurrentFlapResolver, type CurrentFlap } from '../core/flapmap';
 import { buildDisplayModel, deriveLink, type DisplayModel } from '../core/display-model';
-import { interpolationFraction, liveWeight, usesManualBallast, validWeightAnchors } from '../core/weight';
+import { canSaveWeightMode, interpolationFraction, liveWeight, profileForWeightMode, usesManualBallast, validWeightAnchors, weightModeForProfile, type WeightMode } from '../core/weight';
 import { initialBallast, type BallastState } from '../core/ballast';
 import { selectProfileId } from '../core/select';
 import { effectiveBoundaries, smoothStep } from '../core/scale';
@@ -61,6 +61,8 @@ export class App {
   private saveBtn: HTMLButtonElement | null = null;
   /** Profile edits that have not been written yet. The display keeps the last saved profile until Save. */
   unsaved: Profile | null = null;
+  /** In-memory editor intent; only the anchors are persisted in a profile file. */
+  unsavedWeightMode: WeightMode = 'manual';
   private lastTitle: string | null = null;
   private manualPick = false;
   private pendingImport: ImportDraft | null = null;
@@ -287,15 +289,16 @@ export class App {
   }
 
   /** Remember an edited profile until Save. Passing null clears the unsaved copy. */
-  setUnsaved(p: Profile | null): void {
+  setUnsaved(p: Profile | null, weightMode = weightModeForProfile(p)): void {
     this.unsaved = p ? cloneProfile(p) : null;
+    this.unsavedWeightMode = p ? weightMode : 'manual';
     this.paintSaveButton();
   }
 
   private paintSaveButton(): void {
     if (!this.saveBtn) return;
     const dirty = this.unsaved !== null;
-    this.saveBtn.disabled = !dirty;
+    this.saveBtn.disabled = !dirty || !canSaveWeightMode(this.unsaved, this.unsavedWeightMode);
     toggleClass(this.saveBtn, 'dirty', dirty);
   }
 
@@ -303,9 +306,10 @@ export class App {
    * Write a profile and apply it when it is valid. Uses the unsaved draft when no profile is passed.
    * Returns whether the display switched to the saved profile.
    */
-  async saveProfile(p?: Profile): Promise<boolean> {
-    const d = p ?? this.unsaved;
-    if (!d) return false;
+  async saveProfile(p?: Profile, weightMode = p ? weightModeForProfile(p) : this.unsavedWeightMode): Promise<boolean> {
+    const draft = p ?? this.unsaved;
+    if (!draft || !canSaveWeightMode(draft, weightMode)) return false;
+    const d = profileForWeightMode(draft, weightMode);
     await this.deps.store.save(d);
     await this.refreshMetas();
     const did = this.setActiveProfile(cloneProfile(d), false);

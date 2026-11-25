@@ -10,6 +10,7 @@ import {
 } from '../core/profile';
 import { formatSpeedField, heightToMetres, heightUnitLabel, metresToHeight, unitLabel, unitToKnots, type SpeedUnit } from '../core/units';
 import { validateProfile } from '../core/validate';
+import { canSaveWeightMode, profileForWeightMode, weightModeForProfile, type WeightMode } from '../core/weight';
 import { clear, fmtNum, h, numberOrNull, setText, toggleClass } from './dom';
 import type { App } from './app';
 
@@ -25,6 +26,9 @@ type Field = HTMLInputElement | HTMLSelectElement;
 export class SettingsView {
   readonly el: HTMLElement;
   private draft: Profile | null = null;
+  private weightMode: WeightMode = 'manual';
+  private previousWeights: Profile['weight_kg'] | null = null;
+  private saveAsBtn: HTMLButtonElement | null = null;
   private validation: ValidationResult | null = null;
   private prefilled: number[] = [];
   private undo: { profile: Profile; what: string } | null = null;
@@ -83,6 +87,7 @@ export class SettingsView {
     const imp = this.app.consumeImport();
     if (this.app.unsaved) this.draft = cloneProfile(this.app.unsaved);
     else if (this.app.profile) this.draft = cloneProfile(this.app.profile);
+    this.weightMode = this.app.unsaved ? this.app.unsavedWeightMode : weightModeForProfile(this.draft);
     this.dirty = !!this.app.unsaved;
     this.revalidate();
     this.renderAll();
@@ -98,7 +103,7 @@ export class SettingsView {
 
   dispose(): void {
     this.endDrag();
-    if (this.dirty && this.draft) this.app.setUnsaved(this.draft);
+    if (this.dirty && this.draft) this.app.setUnsaved(this.draft, this.weightMode);
   }
 
   private close(): void {
@@ -108,7 +113,7 @@ export class SettingsView {
   // ------------------------------------------------------------------ Drafts
 
   private revalidate(): void {
-    this.validation = this.draft ? validateProfile(this.draft, { liveHandleCount: this.app.liveCount() }) : null;
+    this.validation = this.draft ? validateProfile(this.draft, { liveHandleCount: this.app.liveCount(), requireWeightAnchors: this.weightMode === 'live' }) : null;
   }
 
   /** After any edit: re-validate and refresh field states. The file is written only from Save. */
@@ -119,17 +124,19 @@ export class SettingsView {
     this.renderValidation();
     this.updateLive();
     this.dirty = true;
-    if (this.draft) this.app.setUnsaved(this.draft);
+    if (this.draft) this.app.setUnsaved(this.draft, this.weightMode);
     toggleClass(this.saveState, 'dirty', true);
     setText(this.saveState, 'Unsaved');
     this.paintSaveState();
   }
 
   async saveNow(): Promise<void> {
-    const d = this.draft;
-    if (!d) return;
+    const draft = this.draft;
+    if (!draft || !canSaveWeightMode(draft, this.weightMode)) return;
+    const d = profileForWeightMode(draft, this.weightMode);
+    this.draft = d;
     const applied = !!(this.validation && this.validation.ok);
-    const did = await this.app.saveProfile(d);
+    const did = await this.app.saveProfile(d, this.weightMode);
     this.dirty = false;
     toggleClass(this.saveState, 'dirty', false);
     setText(this.saveState, applied && did ? 'Saved and applied' : applied ? 'Saved' : 'Saved as incomplete. Not applied: fix errors');
@@ -138,12 +145,16 @@ export class SettingsView {
   }
 
   private paintSaveState(): void {
-    this.saveBtn.disabled = !this.dirty || !this.draft;
+    const canSave = canSaveWeightMode(this.draft, this.weightMode);
+    this.saveBtn.disabled = !this.dirty || !canSave;
+    if (this.saveAsBtn) this.saveAsBtn.disabled = !canSave;
     toggleClass(this.saveBtn, 'dirty', this.dirty);
   }
 
   private setDraft(p: Profile | null): void {
     this.draft = p;
+    this.weightMode = weightModeForProfile(p);
+    this.previousWeights = null;
     this.dirty = false;
     this.app.setUnsaved(null);
     this.prefilled = [];
@@ -212,7 +223,8 @@ export class SettingsView {
       h('label', { class: 'fh-slide' + (enabled ? '' : ' off') }, h('input', { type: 'checkbox', class: cls, 'aria-label': label, checked: on, disabled: !enabled, onchange: (e: Event) => set((e.target as HTMLInputElement).checked) }), h('span', { class: 'fh-slidetrack' }, h('span', { class: 'fh-slideknob' })));
     const row = (label: string, control: HTMLElement) => h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, label), control);
     const toggles = h('div', { class: 'fh-toggles' }, h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'Speed'), h('span', { class: 'fh-units' }, unitBtn('kt', 'kt'), unitBtn('kmh', 'km/h'))), h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'Altitude'), h('span', { class: 'fh-units fh-height' }, heightBtn('ft', 'ft'), heightBtn('m', 'm'))), row('Flap transitions', sw('fh-show-transitions', u.show_transitions, 'Flap transitions', (v) => app.setShowTransitions(v))), row('Weight / ballast bar', sw('fh-show-ballast', u.show_ballast, 'Weight / ballast bar', (v) => app.setShowBallast(v))), h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'AGL bar'), sw('fh-show-agl', u.show_agl, 'AGL bar', (v) => { app.setShowAgl(v); this.renderProfileBar(); }), h('span', { class: 'fh-unitlab fh-beside' + (u.show_agl ? '' : ' off') }, 'Wind speed'), sw('fh-show-wind', u.show_wind, 'Wind speed', (v) => app.setShowWind(v), u.show_agl)));
-    const profile = h('div', { class: 'fh-prow' }, h('label', null, 'Profile'), shown, files ? h('button', { class: 'fh-btn fh-open', type: 'button', onclick: () => void this.openFile() }, 'Open...') : null, files ? h('button', { class: 'fh-btn fh-saveas', type: 'button', onclick: () => void this.saveAs() }, 'Save As...') : null, app.host.capabilities.openFolder ? h('button', { class: 'fh-btn', type: 'button', onclick: () => app.host.openProfilesFolder() }, 'Open profiles folder') : null);
+    this.saveAsBtn = files ? h('button', { class: 'fh-btn fh-saveas', type: 'button', disabled: !canSaveWeightMode(this.draft, this.weightMode), onclick: () => void this.saveAs() }, 'Save As...') as HTMLButtonElement : null;
+    const profile = h('div', { class: 'fh-prow' }, h('label', null, 'Profile'), shown, files ? h('button', { class: 'fh-btn fh-open', type: 'button', onclick: () => void this.openFile() }, 'Open...') : null, this.saveAsBtn, app.host.capabilities.openFolder ? h('button', { class: 'fh-btn', type: 'button', onclick: () => app.host.openProfilesFolder() }, 'Open profiles folder') : null);
     this.profileBar.appendChild(toggles);
     this.profileBar.appendChild(profile);
     if (!this.draft) {
@@ -269,13 +281,18 @@ export class SettingsView {
       );
     };
 
-    this.table.appendChild(h('div', { class: 'fh-erow' },
+    const mode = h('select', { class: 'fh-in fh-weight-mode', 'aria-label': 'Flying weight mode', onchange: (e: Event) => this.selectWeightMode((e.target as HTMLSelectElement).value as WeightMode) },
+      h('option', { value: 'manual' }, 'Manual ballast slider'), h('option', { value: 'live' }, 'Live flying weight')) as HTMLSelectElement;
+    // The DOM helper sets value before appending options; select explicitly afterwards.
+    mode.value = this.weightMode;
+    this.table.appendChild(h('div', { class: 'fh-erow' }, h('label', { class: 'fh-rowname' }, 'Weight mode'), mode));
+    if (this.weightMode === 'live') this.table.appendChild(h('div', { class: 'fh-erow' },
       h('label', { class: 'fh-rowname' }, 'Flying weights (kg)'),
       h('label', { class: 'fh-sub' }, 'Light'),
       this.fieldInput('weight_kg.light', fmtNum(d.weight_kg.light), { cls: 'fh-speed', step: '1', label: 'Light flying weight (kg)', onInput: (t) => { d.weight_kg.light = numberOrNull(t); } }),
       h('label', { class: 'fh-sub' }, 'Heavy'),
       this.fieldInput('weight_kg.heavy', fmtNum(d.weight_kg.heavy), { cls: 'fh-speed', step: '1', label: 'Heavy flying weight (kg)', onInput: (t) => { d.weight_kg.heavy = numberOrNull(t); } })));
-    this.table.appendChild(h('div', { class: 'fh-hint' }, 'Optional: enter both loaded weights for automatic interpolation; otherwise the manual ballast slider uses the No/Max Ballast speeds.'));
+    this.table.appendChild(h('div', { class: 'fh-hint' }, this.weightMode === 'live' ? 'Enter both positive loaded weights (Light below Heavy) before saving. The display uses live MSFS aircraft weight.' : 'No flying weights are required. The display uses the saved manual slider position with the No/Max Ballast speeds.'));
     this.table.appendChild(speedRow('Min (stall)', 'fh-minrow', null, () => d.vs_min, 'vs_min', true));
 
     d.flaps.forEach((row, i) => {
@@ -342,6 +359,19 @@ export class SettingsView {
       ));
     }
     else this.table.appendChild(h('div', { class: 'fh-hint' }, 'No flap rows: the display shows "no flaps". Add a row to start.'));
+  }
+
+  private selectWeightMode(mode: WeightMode): void {
+    if (!this.draft || mode === this.weightMode || (mode !== 'manual' && mode !== 'live')) return;
+    if (mode === 'manual') {
+      this.previousWeights = { ...this.draft.weight_kg };
+      this.draft.weight_kg = { light: null, heavy: null };
+    } else if (this.previousWeights) {
+      this.draft.weight_kg = { ...this.previousWeights };
+    }
+    this.weightMode = mode;
+    this.edited(true);
+    this.table.querySelector<HTMLElement>('.fh-weight-mode')?.focus();
   }
 
   /** Drag a row (anywhere but its text field or buttons) to move its label. Mouse and touch only. */
@@ -547,8 +577,9 @@ export class SettingsView {
   }
 
   private async saveAs(): Promise<void> {
-    if (!this.draft) return;
-    const ok = await this.app.host.saveJson(this.draft.id + '.flaphappy.json', exportProfileJson(this.draft));
+    if (!this.draft || !canSaveWeightMode(this.draft, this.weightMode)) return;
+    const p = profileForWeightMode(this.draft, this.weightMode);
+    const ok = await this.app.host.saveJson(p.id + '.flaphappy.json', exportProfileJson(p));
     setText(this.saveState, ok ? 'Exported' : 'Export cancelled');
   }
 

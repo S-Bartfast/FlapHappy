@@ -22,7 +22,7 @@ With MSFS 2024: start the sim first or after, either works. Flap Happy reconnect
 ### First use
 1. Click the cog (top right) to open the settings.
 2. A new install, or an empty profile folder, gets **AS33-18m**, **AS33-15m**, and **JS3**. AS33-18m opens first. Profiles already in the folder are not copied again.
-3. Optionally enter both loaded Light and Heavy reference weights (kg) for the two speed columns then save the profile. MSFS supplies actual weight. Leave either anchor blank to keep using the original manual ballast slider, including for existing profiles; its position is saved per profile. A profile with both weights never falls back to manual ballast on missing or stale telemetry.
+3. Select Manual ballast slider (the default for a new local profile) or Live flying weight. In Manual mode no weight anchors are required. Live mode requires both positive loaded Light and Heavy reference weights (kg), with Light below Heavy, before saving. Existing profiles infer the mode from the anchors; no extra mode field is stored. MSFS supplies actual weight in Live mode. Manual ballast position is saved per profile. A profile with both weights never falls back to manual ballast on missing or stale telemetry.
 
 Your data lives in `%APPDATA%\FlapHappy\`:
 - `profiles\<name>.json`: one file per profile (readable, shareable; drag a `.json` onto the window to import).
@@ -101,7 +101,7 @@ A profile has N flap rows (any N from 0 up; each row: label, a sim index you typ
 - The dev panel, scenarios and fault injection (index missing/out of range, percent only, L: var only, unreadable, stale) exist so the whole fallback chain can be exercised without the sim.
 
 ## Tests
-- `npm test`: 105 unit tests (profile model, validation, ballast and scale math, flap resolver, display model, file store, simulated source, scenarios incl. a 20-minute soak, replay, CLI parsing).
+- `npm test`: 106 unit tests (profile model, validation, ballast and scale math, flap resolver, display model, file store, simulated source, scenarios incl. a 20-minute soak, replay, CLI parsing).
 - `npm run test:ui`: 32 tests in a real browser (display for N = 0/1/2/6/10, states, fallbacks, read-only weight indicator, editor, import errors, dev panel, compact) and in a real Electron window under simulated and replay sources (real files, restart persistence, compact window with no MINI/FULL button, recording).
 
 ## Only verifiable on Windows with MSFS 2024

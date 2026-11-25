@@ -2,6 +2,8 @@ import type { Profile } from './types';
 import type { SimSample } from './sim';
 import { clamp01 } from './profile';
 
+export type WeightMode = 'manual' | 'live';
+
 export interface WeightState {
   kg: number | null;
   fraction: number | null;
@@ -19,6 +21,22 @@ export function validWeightAnchors(p: Profile | null): boolean {
  * is a validation error, not a reason to silently switch control modes. */
 export function usesManualBallast(p: Profile | null): boolean {
   return !!p && (p.weight_kg?.light == null || p.weight_kg?.heavy == null);
+}
+
+/** Infer the stored mode from anchors, including old files without this object. */
+export function weightModeForProfile(p: Profile | null): WeightMode {
+  return p && !usesManualBallast(p) ? 'live' : 'manual';
+}
+
+/** Explicitly selected live mode cannot be saved with incomplete or invalid anchors. */
+export function canSaveWeightMode(p: Profile | null, mode: WeightMode): boolean {
+  return !!p && (mode === 'manual' || validWeightAnchors(p));
+}
+
+/** Manual is represented by absent anchors, not an extra profile-format field. */
+export function profileForWeightMode(p: Profile, mode: WeightMode): Profile {
+  if (mode === 'manual' && !usesManualBallast(p)) return { ...p, weight_kg: { light: null, heavy: null } };
+  return p;
 }
 
 /** Clamp the interpolation only; keep the actual flying weight unchanged for display. */

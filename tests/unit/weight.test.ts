@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { liveWeight } from '../../core/weight';
+import { canSaveWeightMode, liveWeight, profileForWeightMode, weightModeForProfile } from '../../core/weight';
 import { buildDisplayModel } from '../../core/display-model';
 import { validateProfile } from '../../core/validate';
 import { exportProfileJson, parseProfileJson } from '../../core/profile';
@@ -61,6 +61,26 @@ describe('loaded flying weight', () => {
     const invalid = makeProfile(2); invalid.weight_kg = { light: 600, heavy: 400 };
     expect(validateProfile(invalid).ok).toBe(false);
     expect(build(invalid, 'live', 500, 0.5).barVisible).toBe(false);
+  });
+
+  it('requires both anchors only when live weight has been explicitly selected in the editor', () => {
+    const p = makeProfile(2);
+    expect(weightModeForProfile(p)).toBe('live');
+    const manual = profileForWeightMode(p, 'manual');
+    expect(manual.weight_kg).toEqual({ light: null, heavy: null });
+    expect(p.weight_kg).toEqual({ light: 400, heavy: 600 });
+    expect(weightModeForProfile(manual)).toBe('manual');
+    expect(canSaveWeightMode(manual, 'manual')).toBe(true);
+    expect(canSaveWeightMode(manual, 'live')).toBe(false);
+    expect(validateProfile(manual).ok).toBe(true);
+    expect(validateProfile(manual, { requireWeightAnchors: true }).errors.map(e => e.code)).toEqual(['weight-light-required', 'weight-heavy-required']);
+    manual.weight_kg.light = 400;
+    expect(canSaveWeightMode(manual, 'live')).toBe(false);
+    expect(profileForWeightMode(manual, 'manual').weight_kg.light).toBe(400); // retain an untouched legacy partial anchor
+    manual.weight_kg.heavy = 400;
+    expect(canSaveWeightMode(manual, 'live')).toBe(false);
+    manual.weight_kg.heavy = 600;
+    expect(canSaveWeightMode(manual, 'live')).toBe(true);
   });
 
 });
