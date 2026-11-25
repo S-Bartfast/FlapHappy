@@ -114,3 +114,6 @@ Everything above runs and is tested without the sim. These need a real Windows m
 6. Packaging: the portable exe starts, SmartScreen behaviour, `%APPDATA%\FlapHappy` creation, file open/save dialogs, "Open profiles folder".
 7. Cockpit panel: Settings → Window and app → **Install cockpit panel**, then restart MSFS. In the cockpit (including VR) press Tab and open **Flap Happy**. The desktop app must be running; the panel shows that same display.
 8. The `--record` trace from a real flight replays correctly with `--source=replay`.
+
+### Responsive speed-trigger labels
+When **Flap transitions** is enabled, the whole-number speed labels occupy a single row where their measured text widths fit. Crowded labels alternate between two rows while remaining aligned with the real dividers. Extremely dense values remain available on the dividers rather than overlapping neighboring text. The IAS calculations and units are unchanged.
