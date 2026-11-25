@@ -109,6 +109,8 @@ export interface Settings {
     show_ballast: boolean;
     /** The height bar on the display. */
     show_agl: boolean;
+    /** Hide only the in-sim toolbar panel in recognized external camera views. */
+    auto_hide_external: boolean;
     /** The transition speeds under the flap row. */
     show_transitions: boolean;
     /** The wind speed drawn on the AGL bar. */

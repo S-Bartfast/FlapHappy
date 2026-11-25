@@ -25,6 +25,21 @@ async function launch(userData: string, extra: string[] = ['--source=simulated']
 }
 
 describe.skipIf(!canRun)('Electron shell (simulated source): window, files, restart', () => {
+  it('persists Auto-hide preference across restart and publishes it without hiding the desktop', async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-auto-hide-'));let session=await launch(ud);
+    try{
+      let {app,page}=session;const read=async()=> (await (await fetch('http://127.0.0.1:47321/panel-settings')).json()).autoHideExternal;
+      await page.waitForSelector('.fh-display .fh-fit');await page.waitForFunction(()=>!!(window as any).__flapHappy);expect(await read()).toBe(false);
+      await page.click('.fh-cog');await page.getByText('Window and app',{exact:true}).click();expect(await page.locator('.fh-auto-hide-external').isChecked()).toBe(false);
+      await page.check('.fh-auto-hide-external');await page.click('.fh-back');await page.waitForSelector('.fh-display .fh-fit',{state:'visible'});
+      for(let i=0;i<10&&await read()!==true;i++)await page.waitForTimeout(120);expect(await read()).toBe(true);
+      await page.waitForTimeout(700);await app.close();session=await launch(ud);({app,page}=session);
+      await page.click('.fh-cog');await page.getByText('Window and app',{exact:true}).click();expect(await page.locator('.fh-auto-hide-external').isChecked()).toBe(true);
+      await page.uncheck('.fh-auto-hide-external');await page.click('.fh-back');await page.waitForSelector('.fh-display .fh-fit',{state:'visible'});
+      for(let i=0;i<10&&await read()!==false;i++)await page.waitForTimeout(120);expect(await read()).toBe(false);
+    }finally{await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
+  });
+
   it('opens the window, builds a profile in the editor, saves real files, and restores everything after a restart', async () => {
     const ud = fs.mkdtempSync(path.join(os.tmpdir(), 'flaphappy-e2e-'));
     let { app, page } = await launch(ud);

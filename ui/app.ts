@@ -394,6 +394,11 @@ export class App {
     this.renderAll();
   }
 
+  setAutoHideExternal(on:boolean):void {
+    this.settings.ui.auto_hide_external=on;
+    this.persistSoon();this.renderAll();
+  }
+
   setShowAgl(on: boolean): void {
     this.settings.ui.show_agl = on;
     this.persistSoon();
@@ -532,6 +537,7 @@ export class App {
       zoom: this.settings.ui.zoom,
       showBallast: this.settings.ui.show_ballast,
       showAgl: this.settings.ui.show_agl,
+      autoHideExternal:this.settings.ui.auto_hide_external,
       showTransitions: this.settings.ui.show_transitions,
       showWind: this.settings.ui.show_wind,
       barShading: this.settings.ui.bar_shading,
