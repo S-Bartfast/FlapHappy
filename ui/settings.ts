@@ -8,7 +8,7 @@ import {
   profileLabel,
   transitionName,
 } from '../core/profile';
-import { formatSpeedField, unitLabel, unitToKnots, type SpeedUnit } from '../core/units';
+import { formatSpeedField, heightToMetres, heightUnitLabel, metresToHeight, unitLabel, unitToKnots, type SpeedUnit } from '../core/units';
 import { validateProfile } from '../core/validate';
 import { clear, fmtNum, h, numberOrNull, setText, toggleClass } from './dom';
 import type { App } from './app';
@@ -45,6 +45,8 @@ export class SettingsView {
   private advanced: HTMLElement;
   private appBox: HTMLElement;
   private dragStop: (() => void) | null = null;
+  private aglInputs: HTMLInputElement[] = [];
+  private aglUnits: HTMLElement[] = [];
 
   constructor(private app: App) {
     this.saveBtn = h('button', { class: 'fh-btn fh-save', type: 'button', disabled: true, onclick: () => void this.saveNow() }, 'Save') as HTMLButtonElement;
@@ -170,6 +172,19 @@ export class SettingsView {
     this.updateFieldStates();
   }
 
+  private setHeight(unit: 'ft' | 'm'): void {
+    this.app.setHeightUnit(unit);
+    this.renderProfileBar();
+    this.syncAglFields();
+  }
+
+  private syncAglFields(): void {
+    const unit = this.app.settings.height === 'm' ? 'm' : 'ft';
+    const keys: Array<'bottom_m' | 'top_m' | 'low_m' | 'high_m'> = ['bottom_m', 'top_m', 'low_m', 'high_m'];
+    for (let i = 0; i < this.aglInputs.length; i++) this.aglInputs[i].value = String(metresToHeight(this.app.settings.agl[keys[i]], unit));
+    for (let i = 0; i < this.aglUnits.length; i++) setText(this.aglUnits[i], heightUnitLabel(unit));
+  }
+
   private renderAll(): void {
     this.renderProfileBar();
     this.renderTable();
@@ -186,10 +201,20 @@ export class SettingsView {
     clear(this.profileBar);
     const files = app.host.capabilities.files;
     const unit = app.settings.units === 'kmh' ? 'kmh' : 'kt';
+    const height = app.settings.height === 'm' ? 'm' : 'ft';
     const unitBtn = (id: SpeedUnit, label: string) =>
       h('button', { class: 'fh-btn fh-unitbtn' + (unit === id ? ' on' : ''), type: 'button', onclick: () => this.setUnits(id) }, label);
+    const heightBtn = (id: 'ft' | 'm', label: string) =>
+      h('button', { class: 'fh-btn fh-unitbtn' + (height === id ? ' on' : ''), type: 'button', onclick: () => this.setHeight(id) }, label);
     const shown = this.draft ? h('span', { class: 'fh-profilename' }, profileLabel(this.draft.id)) : null;
-    this.profileBar.appendChild(h('div', { class: 'fh-prow' }, h('label', null, 'Profile'), shown, files ? h('button', { class: 'fh-btn fh-open', type: 'button', onclick: () => void this.openFile() }, 'Open...') : null, files ? h('button', { class: 'fh-btn fh-saveas', type: 'button', onclick: () => void this.saveAs() }, 'Save As...') : null, app.host.capabilities.openFolder ? h('button', { class: 'fh-btn', type: 'button', onclick: () => app.host.openProfilesFolder() }, 'Open profiles folder') : null, h('span', { class: 'fh-units' }, unitBtn('kt', 'kt'), unitBtn('kmh', 'km/h'))));
+    const u = app.settings.ui;
+    const sw = (cls: string, on: boolean, label: string, set: (v: boolean) => void, enabled = true) =>
+      h('label', { class: 'fh-slide' + (enabled ? '' : ' off') }, h('input', { type: 'checkbox', class: cls, 'aria-label': label, checked: on, disabled: !enabled, onchange: (e: Event) => set((e.target as HTMLInputElement).checked) }), h('span', { class: 'fh-slidetrack' }, h('span', { class: 'fh-slideknob' })));
+    const row = (label: string, control: HTMLElement) => h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, label), control);
+    const toggles = h('div', { class: 'fh-toggles' }, h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'Speed'), h('span', { class: 'fh-units' }, unitBtn('kt', 'kt'), unitBtn('kmh', 'km/h'))), h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'Altitude'), h('span', { class: 'fh-units fh-height' }, heightBtn('ft', 'ft'), heightBtn('m', 'm'))), row('Flap transitions', sw('fh-show-transitions', u.show_transitions, 'Flap transitions', (v) => app.setShowTransitions(v))), row('Ballast bar', sw('fh-show-ballast', u.show_ballast, 'Ballast bar', (v) => app.setShowBallast(v))), h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'AGL bar'), sw('fh-show-agl', u.show_agl, 'AGL bar', (v) => { app.setShowAgl(v); this.renderProfileBar(); }), h('span', { class: 'fh-unitlab fh-beside' + (u.show_agl ? '' : ' off') }, 'Wind speed'), sw('fh-show-wind', u.show_wind, 'Wind speed', (v) => app.setShowWind(v), u.show_agl)));
+    const profile = h('div', { class: 'fh-prow' }, h('label', null, 'Profile'), shown, files ? h('button', { class: 'fh-btn fh-open', type: 'button', onclick: () => void this.openFile() }, 'Open...') : null, files ? h('button', { class: 'fh-btn fh-saveas', type: 'button', onclick: () => void this.saveAs() }, 'Save As...') : null, app.host.capabilities.openFolder ? h('button', { class: 'fh-btn', type: 'button', onclick: () => app.host.openProfilesFolder() }, 'Open profiles folder') : null);
+    this.profileBar.appendChild(toggles);
+    this.profileBar.appendChild(profile);
     if (!this.draft) {
       this.profileBar.appendChild(h('div', { class: 'fh-hint' }, 'No profile yet. Open a profile file to start.'));
     }
@@ -457,19 +482,30 @@ export class SettingsView {
     if (!d) return;
     const num = (label: string, get: () => number | null, set: (v: number | null) => void, step = '1', ph = '') =>
       h('div', { class: 'fh-arow' }, h('label', null, label), h('input', { class: 'fh-in', type: 'number', step, value: fmtNum(get()), placeholder: ph, oninput: (e: Event) => { set(numberOrNull((e.target as HTMLInputElement).value)); this.edited(false); } }));
-    const check = (label: string, get: () => boolean, set: (v: boolean) => void) =>
-      h('div', { class: 'fh-arow' }, h('label', { class: 'fh-check' }, h('input', { type: 'checkbox', checked: get(), onchange: (e: Event) => { set((e.target as HTMLInputElement).checked); this.edited(false); } }), ' ' + label));
     const text = (label: string, get: () => string, set: (v: string) => void, ph = '') =>
       h('div', { class: 'fh-arow' }, h('label', null, label), h('input', { class: 'fh-in fh-wide', type: 'text', value: get(), placeholder: ph, oninput: (e: Event) => { set((e.target as HTMLInputElement).value); this.edited(false); } }));
 
+    const height = this.app.settings.height === 'm' ? 'm' : 'ft';
+    this.aglInputs = [];
+    this.aglUnits = [];
+    const aglField = (label: string, key: 'bottom_m' | 'top_m' | 'low_m' | 'high_m') => {
+      const input = h('input', { class: 'fh-in', type: 'number', min: '0', step: '1', value: String(metresToHeight(this.app.settings.agl[key], height)), oninput: (e: Event) => { const v = numberOrNull((e.target as HTMLInputElement).value); if (v === null || v < 0) return; this.app.setAglEdge(key, heightToMetres(v, this.app.settings.height === 'm' ? 'm' : 'ft')); } }) as HTMLInputElement;
+      const unitEl = h('span', { class: 'fh-pct' }, heightUnitLabel(height));
+      this.aglInputs.push(input);
+      this.aglUnits.push(unitEl);
+      return h('span', { class: 'fh-aglfield' }, h('label', null, label), input, unitEl);
+    };
     const body = h('div', { class: 'fh-advbody' },
       h('div', { class: 'fh-subtitle' }, 'Display'),
       num('Marker smoothing (ms, 0 = off)', () => d.marker_smoothing_ms, (v) => { d.marker_smoothing_ms = Math.max(0, v ?? 0); }, '50'),
-      check('Red text when the current flap is above its VFE', () => d.display.vfe_overlay, (v) => { d.display.vfe_overlay = v; }),
+      h('div', { class: 'fh-arow' }, h('label', null, 'Bar shading'), h('label', { class: 'fh-slide' }, h('input', { type: 'checkbox', class: 'fh-bar-shading', 'aria-label': 'Bar shading', checked: this.app.settings.ui.bar_shading, onchange: (e: Event) => this.app.setBarShading((e.target as HTMLInputElement).checked) }), h('span', { class: 'fh-slidetrack' }, h('span', { class: 'fh-slideknob' })))),
+      h('div', { class: 'fh-subtitle' }, 'AGL bar'),
+      h('div', { class: 'fh-sub' }, 'The bar runs from Bottom to Top and turns green from Low to High.'),
+      h('div', { class: 'fh-arow' }, aglField('Bottom', 'bottom_m'), aglField('Top', 'top_m')),
+      h('div', { class: 'fh-arow' }, aglField('Low', 'low_m'), aglField('High', 'high_m')),
       h('div', { class: 'fh-subtitle' }, 'Ballast slider'),
       h('div', { class: 'fh-arow' }, h('label', null, 'Default ballast'), h('input', { class: 'fh-in', type: 'number', min: '0', max: '100', step: '5', value: String(Math.round(d.ballast.default_fraction * 100)), oninput: (e: Event) => { const v = numberOrNull((e.target as HTMLInputElement).value); d.ballast.default_fraction = Math.max(0, Math.min(100, v ?? 0)) / 100; this.edited(false); } }), h('span', { class: 'fh-pct' }, '%')),
       h('div', { class: 'fh-arow' }, h('label', null, 'Drag snap'), h('input', { class: 'fh-in', type: 'number', min: '0', max: '100', step: '1', value: String(Math.round(d.ballast.drag_snap * 100)), oninput: (e: Event) => { const v = numberOrNull((e.target as HTMLInputElement).value); d.ballast.drag_snap = Math.max(0, Math.min(100, v ?? 0)) / 100; this.edited(false); } }), h('span', { class: 'fh-pct' }, '%')),
-      num('Max ballast (litres, optional)', () => d.ballast.max_ballast_litres, (v) => { d.ballast.max_ballast_litres = v; }, '1', 'blank = do not show'),
       h('div', { class: 'fh-subtitle' }, 'Aircraft'),
       text('Match aircraft title containing (comma separated)', () => d.match.title_contains.join(', '), (v) => { d.match.title_contains = v.split(',').map((x) => x.trim()).filter(Boolean); }, 'e.g. AS 33'),
       text('Notes', () => d.notes, (v) => { d.notes = v; }),

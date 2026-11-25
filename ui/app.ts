@@ -46,6 +46,7 @@ export class App {
 
   private resolver = new CurrentFlapResolver();
   private smoothIas: number | null = null;
+  private smoothAgl: number | null = null;
   private smoothAt = 0;
   private strip!: StripView;
   private slider!: BallastSlider;
@@ -204,6 +205,7 @@ export class App {
     if (d.realSource) d.realSource.stop();
     this.resolver.reset();
     this.smoothIas = null;
+    this.smoothAgl = null;
     this.lastSample = null;
     if (this.usingSim) {
       this.syncSimToProfile();
@@ -238,12 +240,17 @@ export class App {
       this.lastTitle = s.aircraftTitle;
       void this.autoSelectForTitle(s.aircraftTitle);
     }
-    if (s.connected && s.iasKt !== null && this.profile) {
+    if (s.connected && this.profile) {
       const dt = this.smoothAt ? now - this.smoothAt : 0;
-      this.smoothIas = smoothStep(this.smoothIas, s.iasKt, dt, this.profile.marker_smoothing_ms);
+      const tau = this.profile.marker_smoothing_ms;
+      if (s.iasKt !== null) this.smoothIas = smoothStep(this.smoothIas, s.iasKt, dt, tau);
+      else this.smoothIas = null;
+      if (s.aglFt !== null) this.smoothAgl = smoothStep(this.smoothAgl, s.aglFt, dt, tau);
+      else this.smoothAgl = null;
       this.smoothAt = now;
     } else {
       this.smoothIas = null;
+      this.smoothAgl = null;
     }
     this.renderAll();
   }
@@ -336,6 +343,12 @@ export class App {
     this.renderAll();
   }
 
+  setHeightUnit(unit: 'ft' | 'm'): void {
+    this.settings.height = unit;
+    this.persistSoon();
+    this.renderAll();
+  }
+
   setBallast(f: number, touched: boolean): void {
     this.ballast = { f: clamp01(f), unconfirmed: touched ? false : this.ballast.unconfirmed, restored: touched ? false : this.ballast.restored };
     if (this.profile) this.settings.ballast_by_profile[this.profile.id] = this.ballast.f;
@@ -371,6 +384,43 @@ export class App {
   setAlwaysOnTop(on: boolean): void {
     this.settings.ui.always_on_top = on;
     this.deps.host.setAlwaysOnTop(on);
+    this.persistSoon();
+    this.renderAll();
+  }
+
+  setShowBallast(on: boolean): void {
+    this.settings.ui.show_ballast = on;
+    this.persistSoon();
+    this.renderAll();
+  }
+
+  setShowAgl(on: boolean): void {
+    this.settings.ui.show_agl = on;
+    this.persistSoon();
+    this.renderAll();
+  }
+
+  setShowTransitions(on: boolean): void {
+    this.settings.ui.show_transitions = on;
+    this.persistSoon();
+    this.renderAll();
+  }
+
+  setShowWind(on: boolean): void {
+    this.settings.ui.show_wind = on;
+    this.persistSoon();
+    this.renderAll();
+  }
+
+  setBarShading(on: boolean): void {
+    this.settings.ui.bar_shading = on;
+    this.persistSoon();
+    this.renderAll();
+  }
+
+  setAglEdge(key: 'bottom_m' | 'top_m' | 'low_m' | 'high_m', metres: number): void {
+    if (!isFinite(metres)) return;
+    this.settings.agl[key] = Math.max(0, Math.min(18288, Math.round(metres * 100) / 100));
     this.persistSoon();
     this.renderAll();
   }
@@ -439,8 +489,11 @@ export class App {
       link,
       f,
       ias: this.smoothIas,
+      aglFt: this.smoothAgl,
       flap,
       units: this.settings.units,
+      height: this.settings.height,
+      agl: this.settings.agl,
     });
   }
 
@@ -448,7 +501,7 @@ export class App {
     if (!this.strip) return;
     const model = this.buildModelFor(this.profile, this.validation, this.ballast.f);
     this.lastModel = model;
-    this.strip.render(model, { profile: this.profile, zoom: this.settings.ui.zoom });
+    this.strip.render(model, { profile: this.profile, zoom: this.settings.ui.zoom, showBallast: this.settings.ui.show_ballast, showAgl: this.settings.ui.show_agl, showTransitions: this.settings.ui.show_transitions, showWind: this.settings.ui.show_wind, barShading: this.settings.ui.bar_shading });
     this.slider.render(this.profile, this.ballast);
     setText(this.titleEl, this.profile ? profileLabel(this.profile.id) : 'Flap Happy');
     const bits: string[] = [];
@@ -474,7 +527,14 @@ export class App {
       receivedAt: this.lastRx,
       ballast: this.ballast.f,
       units: this.settings.units === 'kmh' ? 'kmh' : 'kt',
+      height: this.settings.height === 'm' ? 'm' : 'ft',
+      agl: this.settings.agl,
       zoom: this.settings.ui.zoom,
+      showBallast: this.settings.ui.show_ballast,
+      showAgl: this.settings.ui.show_agl,
+      showTransitions: this.settings.ui.show_transitions,
+      showWind: this.settings.ui.show_wind,
+      barShading: this.settings.ui.bar_shading,
     };
     void bridge.invoke('panel:state', state);
   }
