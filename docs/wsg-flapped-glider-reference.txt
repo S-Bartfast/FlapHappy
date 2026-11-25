@@ -1,0 +1,283 @@
+WSG FLAPPED GLIDER PROFILE REFERENCE - MSFS ONLY
+================================================
+
+Public snapshot retrieved: 2026-11-25 10:33 UTC
+Catalog: https://wesimglide.org/api/flap-happy/catalog-v2.json
+Catalog schema: wsg.flaphappy.catalog/2; revision: 15; published profiles: 11
+Glider roster and resolver rules: https://wesimglide.org/api/GetGliderRules.php
+Coverage: 11 of 23 active WSG glider variants are flapped; 11/11 flapped variants have published defaults. Unflapped variants are omitted.
+Transitions: 60 total; 46 shown; 14 explicitly excluded; 0 unspecified visibility; 0 missing one or both IAS values.
+Stall IAS pairs published: 0/11.
+
+Purpose: reference for Flap Happy development and simulator testing only.
+These are current WSG.org starter values for the named MSFS add-ons and variants.
+They include provisional estimates and user-configured defaults; they are not
+verified flight-test measurements, aircraft flight-manual data, placards, or
+airworthiness or operational guidance for real aircraft. Do not treat them as
+manufacturer-approved values or install them automatically.
+
+Reading the tables:
+  * Light and Heavy are loaded flying weights in kg, not empty weight and not
+    necessarily MTOW. MTOW is separately quoted from the exact WSG reference.
+  * All transition speeds are IAS. The metric column is the published wire IAS
+    multiplied by exactly 1.852, rounded to six decimal places for readability.
+    The wire appendix under each table retains the source JSON knot numbers
+    exactly, including the full decimal representations returned by the API.
+  * VNE is the separate WSG reference TAS value in km/h, not an IAS limit.
+  * Starting detents use the catalog baseline of zero; that zero is not a
+    measured stall speed or an independent transition. Final detent has no
+    extra table IAS ceiling. Native simulator handle indices are zero-based.
+  * A transition with Excluded is explicitly hidden by the WSG default; its
+    published IAS is still recorded below and is not missing. Missing IAS is
+    marked --, never replaced by zero or inferred. Not specified is an absent
+    visibility flag, separate from an explicit Shown flag.
+  * Stall IAS endpoints are listed only if the catalog publishes them; an
+    unavailable endpoint is not a zero and must not be inferred from another
+    speed, the first divider, MTOW or VNE.
+  * Source links identify exact matching variants. Some WSG reference queries
+    require the published aircraft alias instead of the canonical key; each
+    returned gliderKey was checked against the canonical variant listed.
+
+PUBLISHED VARIANT TABLES
+------------------------
+
+AS33-15-GF - Schleicher AS 33 Me 15m (GotFriends)
+  Reference: https://wesimglide.org/api/GetGliderReference.php?type=AS33-15-GF
+  WSG MTOW: 550 kg | VNE: 282 km/h TAS
+  Light / Heavy loaded flying weights: 475 / 550 kg
+  Light / Heavy stall IAS (km/h): not published / not published
+  Flap count: 8; starting detent: L (index 7)
+  Transition                 | Light IAS | Heavy IAS | Display default
+  (from -> to, native index) |  (km/h)   |  (km/h)   |
+  L -> 6 (7->6)              |        88 |        95 | Excluded
+  6 -> 5 (6->5)              |        95 |       103 | Excluded
+  5 -> N (5->4)              |       101 |       110 | Shown
+  N -> 4 (4->3)              |       122 |       133 | Shown
+  4 -> 3 (3->2)              |       136 |       147 | Shown
+  3 -> 2 (2->1)              |       165 |       176 | Shown
+  2 -> 1 (1->0)              |       188 |       200 | Shown
+
+  Source wire IAS (kt; exact JSON decimals):
+    L -> 6 (7->6): Light=47.5161987041036724122022860683500766754150390625; Heavy=51.29589632829373613276402465999126434326171875
+    6 -> 5 (6->5): Light=51.29589632829373613276402465999126434326171875; Heavy=55.61555075593952324197744019329547882080078125
+    5 -> N (5->4): Light=54.535637149028076464674086309969425201416015625; Heavy=59.3952483801295869625391787849366664886474609375
+    N -> 4 (4->3): Light=65.8747300215982676263593020848929882049560546875; Heavy=71.814254859611224901527748443186283111572265625
+    4 -> 3 (3->2): Light=73.4341252699783950674827792681753635406494140625; Heavy=79.3736501079913665535059408284723758697509765625
+    3 -> 2 (2->1): Light=89.0928725701943875492361257784068584442138671875; Heavy=95.032397408207344824404572136700153350830078125
+    2 -> 1 (1->0): Light=101.511879049676025488224695436656475067138671875; Heavy=107.991360691144706152044818736612796783447265625
+
+AS33-18-GF - Schleicher AS 33 Me 18m (GotFriends)
+  Reference: https://wesimglide.org/api/GetGliderReference.php?type=AS33-18-GF
+  WSG MTOW: 600 kg | VNE: 282 km/h TAS
+  Light / Heavy loaded flying weights: 485 / 600 kg
+  Light / Heavy stall IAS (km/h): not published / not published
+  Flap count: 8; starting detent: L (index 7)
+  Transition                 | Light IAS | Heavy IAS | Display default
+  (from -> to, native index) |  (km/h)   |  (km/h)   |
+  L -> 6 (7->6)              |        77 |        86 | Excluded
+  6 -> 5 (6->5)              |        86 |        97 | Excluded
+  5 -> N (5->4)              |        95 |       107 | Shown
+  N -> 4 (4->3)              |       110 |       126 | Shown
+  4 -> 3 (3->2)              |       129 |       146 | Shown
+  3 -> 2 (2->1)              |       156 |       174 | Shown
+  2 -> 1 (1->0)              |       179 |       197 | Shown
+
+  Source wire IAS (kt; exact JSON decimals):
+    L -> 6 (7->6): Light=41.576673866090715137033839710056781768798828125; Heavy=46.4362850971922256348989321850240230560302734375
+    6 -> 5 (6->5): Light=46.4362850971922256348989321850240230560302734375; Heavy=52.375809935205182910067378543317317962646484375
+    5 -> N (5->4): Light=51.29589632829373613276402465999126434326171875; Heavy=57.7753779697624167965841479599475860595703125
+    N -> 4 (4->3): Light=59.3952483801295869625391787849366664886474609375; Heavy=68.0345572354211611809660098515450954437255859375
+    4 -> 3 (3->2): Light=69.654427645788331346921040676534175872802734375; Heavy=78.83369330453564316485426388680934906005859375
+    3 -> 2 (2->1): Light=84.233261339092877051371033303439617156982421875; Heavy=93.9524838012958980471012182533740997314453125
+    2 -> 1 (1->0): Light=96.6522678185745149903596029616892337799072265625; Heavy=106.3714902807775359860897879116237163543701171875
+
+AS33-18-MD - Schleicher AS 33 18m (Madolo)
+  Reference: https://wesimglide.org/api/GetGliderReference.php?type=as33
+  WSG MTOW: 600 kg | VNE: 282 km/h TAS
+  Light / Heavy loaded flying weights: 485 / 600 kg
+  Light / Heavy stall IAS (km/h): not published / not published
+  Flap count: 8; starting detent: L (index 7)
+  Transition                 | Light IAS | Heavy IAS | Display default
+  (from -> to, native index) |  (km/h)   |  (km/h)   |
+  L -> 6 (7->6)              |        77 |        86 | Excluded
+  6 -> 5 (6->5)              |        86 |        97 | Excluded
+  5 -> N (5->4)              |        95 |       107 | Shown
+  N -> 4 (4->3)              |       110 |       126 | Shown
+  4 -> 3 (3->2)              |       129 |       146 | Shown
+  3 -> 2 (2->1)              |       156 |       174 | Shown
+  2 -> 1 (1->0)              |       179 |       197 | Shown
+
+  Source wire IAS (kt; exact JSON decimals):
+    L -> 6 (7->6): Light=41.576673866090715137033839710056781768798828125; Heavy=46.4362850971922256348989321850240230560302734375
+    6 -> 5 (6->5): Light=46.4362850971922256348989321850240230560302734375; Heavy=52.375809935205182910067378543317317962646484375
+    5 -> N (5->4): Light=51.29589632829373613276402465999126434326171875; Heavy=57.7753779697624167965841479599475860595703125
+    N -> 4 (4->3): Light=59.3952483801295869625391787849366664886474609375; Heavy=68.0345572354211611809660098515450954437255859375
+    4 -> 3 (3->2): Light=69.654427645788331346921040676534175872802734375; Heavy=78.83369330453564316485426388680934906005859375
+    3 -> 2 (2->1): Light=84.233261339092877051371033303439617156982421875; Heavy=93.9524838012958980471012182533740997314453125
+    2 -> 1 (1->0): Light=96.6522678185745149903596029616892337799072265625; Heavy=106.3714902807775359860897879116237163543701171875
+
+DG808S-18-TC - DG Flugzeugbau DG-808S 18m (Touching Cloud)
+  Reference: https://wesimglide.org/api/GetGliderReference.php?type=DG808S-18-TC
+  WSG MTOW: 600 kg | VNE: 282 km/h TAS
+  Light / Heavy loaded flying weights: 427 / 600 kg
+  Light / Heavy stall IAS (km/h): not published / not published
+  Flap count: 7; starting detent: L (index 6)
+  Transition                 | Light IAS | Heavy IAS | Display default
+  (from -> to, native index) |  (km/h)   |  (km/h)   |
+  L -> T2 (6->5)             |        74 |        88 | Excluded
+  T2 -> T1 (5->4)            |        79 |        93 | Shown
+  T1 -> 0 (4->3)             |        89 |       105 | Shown
+  0 -> -1 (3->2)             |        98 |       117 | Shown
+  -1 -> -2 (2->1)            |       133 |       157 | Shown
+  -2 -> -3 (1->0)            |       158 |       188 | Shown
+
+  Source wire IAS (kt; exact JSON decimals):
+    L -> T2 (6->5): Light=39.9568034557235449710788088850677013397216796875; Heavy=47.5161987041036724122022860683500766754150390625
+    T2 -> T1 (5->4): Light=42.65658747300216191433719359338283538818359375; Heavy=50.215982721382289355460670776665210723876953125
+    T1 -> 0 (4->3): Light=48.056155507559395800853963010013103485107421875; Heavy=56.695464362850970019280794076621532440185546875
+    0 -> -1 (3->2): Light=52.9157667386609062987190554849803447723388671875; Heavy=63.17494600431965778852827497757971286773681640625
+    -1 -> -2 (2->1): Light=71.814254859611224901527748443186283111572265625; Heavy=84.7732181425486004400227102451026439666748046875
+    -2 -> -3 (1->0): Light=85.3131749460043238286743871867656707763671875; Heavy=101.511879049676025488224695436656475067138671875
+
+JS3-15-BC - Jonker JS3 Rapture 15m (B21-CalVR)
+  Reference: https://wesimglide.org/api/GetGliderReference.php?type=bc_js3-15
+  WSG MTOW: 525 kg | VNE: 292 km/h TAS
+  Light / Heavy loaded flying weights: 366 / 525 kg
+  Light / Heavy stall IAS (km/h): not published / not published
+  Flap count: 6; starting detent: L (index 5)
+  Transition                 | Light IAS | Heavy IAS | Display default
+  (from -> to, native index) |  (km/h)   |  (km/h)   |
+  L -> 5 (5->4)              |        79 |        97 | Excluded
+  5 -> 4 (4->3)              |        85 |       105 | Shown
+  4 -> 3 (3->2)              |       103 |       125 | Shown
+  3 -> 2 (2->1)              |       113 |       140 | Shown
+  2 -> 1 (1->0)              |       169 |       200 | Shown
+
+  Source wire IAS (kt; exact JSON decimals):
+    L -> 5 (5->4): Light=42.65658747300216191433719359338283538818359375; Heavy=52.375809935205182910067378543317317962646484375
+    5 -> 4 (4->3): Light=45.896328293736502246247255243360996246337890625; Heavy=56.695464362850970019280794076621532440185546875
+    4 -> 3 (3->2): Light=55.61555075593952324197744019329547882080078125; Heavy=67.494600431965437792314332909882068634033203125
+    3 -> 2 (2->1): Light=61.015118790496757128494209609925746917724609375; Heavy=75.593952483801302832944202236831188201904296875
+    2 -> 1 (1->0): Light=91.2526997840172811038428335450589656829833984375; Heavy=107.991360691144706152044818736612796783447265625
+
+JS3-15-MD - Jonker JS3 Rapture 15m (Madolo)
+  Reference: https://wesimglide.org/api/GetGliderReference.php?type=JS3-15-MD
+  WSG MTOW: 525 kg | VNE: 292 km/h TAS
+  Light / Heavy loaded flying weights: 415 / 525 kg
+  Light / Heavy stall IAS (km/h): not published / not published
+  Flap count: 6; starting detent: L (index 5)
+  Transition                 | Light IAS | Heavy IAS | Display default
+  (from -> to, native index) |  (km/h)   |  (km/h)   |
+  L -> 5 (5->4)              |        85 |        97 | Excluded
+  5 -> 4 (4->3)              |        90 |       105 | Shown
+  4 -> 3 (3->2)              |       110 |       125 | Shown
+  3 -> 2 (2->1)              |       120 |       140 | Shown
+  2 -> 1 (1->0)              |       180 |       200 | Shown
+
+  Source wire IAS (kt; exact JSON decimals):
+    L -> 5 (5->4): Light=45.896328293736502246247255243360996246337890625; Heavy=52.375809935205182910067378543317317962646484375
+    5 -> 4 (4->3): Light=48.5961123110151191895056399516761302947998046875; Heavy=56.695464362850970019280794076621532440185546875
+    4 -> 3 (3->2): Light=59.3952483801295869625391787849366664886474609375; Heavy=67.494600431965437792314332909882068634033203125
+    3 -> 2 (2->1): Light=64.7948164146868208490559482015669345855712890625; Heavy=75.593952483801302832944202236831188201904296875
+    2 -> 1 (1->0): Light=97.192224622030238379011279903352260589599609375; Heavy=107.991360691144706152044818736612796783447265625
+
+JS3-18-BC - Jonker JS3 Rapture 18m (B21-CalVR)
+  Reference: https://wesimglide.org/api/GetGliderReference.php?type=bc_js3_18m
+  WSG MTOW: 600 kg | VNE: 292 km/h TAS
+  Light / Heavy loaded flying weights: 378 / 600 kg
+  Light / Heavy stall IAS (km/h): not published / not published
+  Flap count: 6; starting detent: L (index 5)
+  Transition                 | Light IAS | Heavy IAS | Display default
+  (from -> to, native index) |  (km/h)   |  (km/h)   |
+  L -> 5 (5->4)              |        77 |        94 | Excluded
+  5 -> 4 (4->3)              |        84 |       105 | Shown
+  4 -> 3 (3->2)              |       103 |       125 | Shown
+  3 -> 2 (2->1)              |       113 |       140 | Shown
+  2 -> 1 (1->0)              |       169 |       200 | Shown
+
+  Source wire IAS (kt; exact JSON decimals):
+    L -> 5 (5->4): Light=41.576673866090715137033839710056781768798828125; Heavy=50.7559395248380127441123477183282375335693359375
+    5 -> 4 (4->3): Light=45.3563714902807788575955783016979694366455078125; Heavy=56.695464362850970019280794076621532440185546875
+    4 -> 3 (3->2): Light=55.61555075593952324197744019329547882080078125; Heavy=67.494600431965437792314332909882068634033203125
+    3 -> 2 (2->1): Light=61.015118790496757128494209609925746917724609375; Heavy=75.593952483801302832944202236831188201904296875
+    2 -> 1 (1->0): Light=91.2526997840172811038428335450589656829833984375; Heavy=107.991360691144706152044818736612796783447265625
+
+JS3-18-MD - Jonker JS3 Rapture 18m (Madolo)
+  Reference: https://wesimglide.org/api/GetGliderReference.php?type=JS3-18-MD
+  WSG MTOW: 600 kg | VNE: 292 km/h TAS
+  Light / Heavy loaded flying weights: 430 / 600 kg
+  Light / Heavy stall IAS (km/h): not published / not published
+  Flap count: 6; starting detent: L (index 5)
+  Transition                 | Light IAS | Heavy IAS | Display default
+  (from -> to, native index) |  (km/h)   |  (km/h)   |
+  L -> 5 (5->4)              |        82 |        94 | Excluded
+  5 -> 4 (4->3)              |        90 |       105 | Shown
+  4 -> 3 (3->2)              |       110 |       125 | Shown
+  3 -> 2 (2->1)              |       120 |       140 | Shown
+  2 -> 1 (1->0)              |       180 |       200 | Shown
+
+  Source wire IAS (kt; exact JSON decimals):
+    L -> 5 (5->4): Light=44.2764578833693320802922244183719158172607421875; Heavy=50.7559395248380127441123477183282375335693359375
+    5 -> 4 (4->3): Light=48.5961123110151191895056399516761302947998046875; Heavy=56.695464362850970019280794076621532440185546875
+    4 -> 3 (3->2): Light=59.3952483801295869625391787849366664886474609375; Heavy=67.494600431965437792314332909882068634033203125
+    3 -> 2 (2->1): Light=64.7948164146868208490559482015669345855712890625; Heavy=75.593952483801302832944202236831188201904296875
+    2 -> 1 (1->0): Light=97.192224622030238379011279903352260589599609375; Heavy=107.991360691144706152044818736612796783447265625
+
+L13-TC - LET L-13 Blanik 16m (Touching Cloud)
+  Reference: https://wesimglide.org/api/GetGliderReference.php?type=L13-TC
+  WSG MTOW: 500 kg | VNE: 253 km/h TAS
+  Light / Heavy loaded flying weights: 372 / 500 kg
+  Light / Heavy stall IAS (km/h): not published / not published
+  Flap count: 3; starting detent: Full (index 2)
+  Transition                 | Light IAS | Heavy IAS | Display default
+  (from -> to, native index) |  (km/h)   |  (km/h)   |
+  Full -> Partial (2->1)     |        69 |        80 | Excluded
+  Partial -> Up (1->0)       |        79 |        92 | Shown
+
+  Source wire IAS (kt; exact JSON decimals):
+    Full -> Partial (2->1): Light=37.25701943844492092239306657575070858001708984375; Heavy=43.1965442764578853029888705350458621978759765625
+    Partial -> Up (1->0): Light=42.65658747300216191433719359338283538818359375; Heavy=49.6760259179265659668089938350021839141845703125
+
+S12G-GF - Stemme S12-G 25m (GotFriends)
+  Reference: https://wesimglide.org/api/GetGliderReference.php?type=S12G-GF
+  WSG MTOW: 900 kg | VNE: 282 km/h TAS
+  Light / Heavy loaded flying weights: 780 / 900 kg
+  Light / Heavy stall IAS (km/h): not published / not published
+  Flap count: 6; starting detent: L (index 5)
+  Transition                 | Light IAS | Heavy IAS | Display default
+  (from -> to, native index) |  (km/h)   |  (km/h)   |
+  L -> +10° (5->4)           |        93 |       100 | Excluded
+  +10° -> +5° (4->3)         |       104 |       112 | Shown
+  +5° -> 0° (3->2)           |       111 |       119 | Shown
+  0° -> -5° (2->1)           |       127 |       136 | Shown
+  -5° -> -10° (1->0)         |       168 |       180 | Shown
+
+  Source wire IAS (kt; exact JSON decimals):
+    L -> +10° (5->4): Light=50.215982721382289355460670776665210723876953125; Heavy=53.9956803455723530760224093683063983917236328125
+    +10° -> +5° (4->3): Light=56.1555075593952466306291171349585056304931640625; Heavy=60.4751619870410337398425326682627201080322265625
+    +5° -> 0° (3->2): Light=59.93520518358531035119085572659969329833984375; Heavy=64.25485961123109746040427125990390777587890625
+    0° -> -5° (2->1): Light=68.57451403887688456961768679320812225341796875; Heavy=73.4341252699783950674827792681753635406494140625
+    -5° -> -10° (1->0): Light=90.712742980561557715191156603395938873291015625; Heavy=97.192224622030238379011279903352260589599609375
+
+SZD562-15-61T - PZL SZD-56-2 Diana 2 15m (61 Tree)
+  Reference: https://wesimglide.org/api/GetGliderReference.php?type=SZD562-15-61T
+  WSG MTOW: 500 kg | VNE: 275 km/h TAS
+  Light / Heavy loaded flying weights: 312 / 500 kg
+  Light / Heavy stall IAS (km/h): not published / not published
+  Flap count: 7; starting detent: 28° (index 6)
+  Transition                 | Light IAS | Heavy IAS | Display default
+  (from -> to, native index) |  (km/h)   |  (km/h)   |
+  28° -> 21° (6->5)          |        71 |        91 | Excluded
+  21° -> 14° (5->4)          |        76 |        98 | Shown
+  14° -> 8° (4->3)           |        82 |       107 | Shown
+  8° -> 3° (3->2)            |       103 |       132 | Shown
+  3° -> 0° (2->1)            |       148 |       184 | Shown
+  0° -> -2° (1->0)           |       179 |       220 | Shown
+
+  Source wire IAS (kt; exact JSON decimals):
+    28° -> 21° (6->5): Light=38.33693304535637480512377806007862091064453125; Heavy=49.1360691144708425781573168933391571044921875
+    21° -> 14° (5->4): Light=41.0367170626349917483821627683937549591064453125; Heavy=52.9157667386609062987190554849803447723388671875
+    14° -> 8° (4->3): Light=44.2764578833693320802922244183719158172607421875; Heavy=57.7753779697624167965841479599475860595703125
+    8° -> 3° (3->2): Light=55.61555075593952324197744019329547882080078125; Heavy=71.2742980561555015128760715015232563018798828125
+    3° -> 0° (2->1): Light=79.913606911447089942157617770135402679443359375; Heavy=99.352051835853131933617987670004367828369140625
+    0° -> -2° (1->0): Light=96.6522678185745149903596029616892337799072265625; Heavy=118.790496760259173925078357569873332977294921875
