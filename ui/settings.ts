@@ -313,7 +313,11 @@ export class SettingsView {
         this.transNames.push(nameEl);
         const trow = speedRow('T' + (i + 1), 'fh-trow', nameEl, () => d.transitions[i], `transitions[${i}]`, false);
         if (this.prefilled.indexOf(i) >= 0) trow.classList.add('prefilled');
-        this.table.appendChild(h('div', { class: 'fh-twrap' }, trow));
+        const excluded=h('input',{type:'checkbox',checked:d.transitions[i].exclude_from_display===true,'aria-label':'Exclude '+transitionName(d,i)+' from display',onchange:(e:Event)=>{
+          d.transitions[i].exclude_from_display=(e.target as HTMLInputElement).checked;
+          this.edited(false);
+        }});
+        this.table.appendChild(h('div', { class: 'fh-twrap' }, trow,h('label',{class:'fh-check fh-exclude-transition'},excluded,' Merge adjoining flap bands (exclude divider)')));
       }
     });
     if (n > 0) {

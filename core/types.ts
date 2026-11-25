@@ -38,7 +38,7 @@ export interface Profile {
   flaps: FlapPosition[];
   handle_count: number | null;
   vs_min: Speed;
-  transitions: Speed[];
+  transitions: Array<Speed & { exclude_from_display?: boolean }>;
   /** Knots. Saved files store this as a single `vne_ms`, with no ballast split. */
   vne: number | null;
   ballast: BallastConfig;

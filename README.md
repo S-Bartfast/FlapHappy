@@ -114,3 +114,6 @@ Everything above runs and is tested without the sim. These need a real Windows m
 6. Packaging: the portable exe starts, SmartScreen behaviour, `%APPDATA%\FlapHappy` creation, file open/save dialogs, "Open profiles folder".
 7. Cockpit panel: Settings → Window and app → **Install cockpit panel**, then restart MSFS. In the cockpit (including VR) press Tab and open **Flap Happy**. The desktop app must be running; the panel shows that same display.
 8. The `--record` trace from a real flight replays correctly with `--source=replay`.
+
+### Merged flap bands
+In Settings, check **Merge adjoining flap bands (exclude divider)** for a transition to omit that speed divider and merge its two adjacent flap labels. Consecutive exclusions form a single band. The actual simulator handle and its exact label are preserved. The optional exclusion is saved with each transition; legacy profiles remain unchanged, and excluded transition speeds are not needed until the divider is shown again.

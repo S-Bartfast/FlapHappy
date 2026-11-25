@@ -219,3 +219,6 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-dev-title { width: 180px; }
 .fh-devrow .fh-btn { margin-left: 0; padding: 3px 8px; }
 .fh-devstate { color: #b8a77a; }
+
+.fh-badge.mapped { color:#fff; background:#275b82; }
+.fh-exclude-transition { margin-left:22px; font-size:12px; color:#afb9c9; }

@@ -1,7 +1,7 @@
 import type { Profile, ValidationResult } from './types';
 import type { SimSample } from './sim';
 import type { CurrentFlap } from './flapmap';
-import { columnEdges, effectiveBoundaries, mapMarker, type MarkerRegion } from './scale';
+import { columnEdges, effectiveBoundaries, flapGroups, mapMarker, type MarkerRegion } from './scale';
 import { aglMarkLabels, aglMarkPositions, defaultAglScale, formatAgl, formatIas, formatTick, type AglScale, type HeightUnit, type SpeedUnit } from './units';
 
 export type LinkState = 'waiting' | 'nodata' | 'paused' | 'live';
@@ -22,7 +22,7 @@ export interface CellModel {
 }
 
 export interface FlapBadge {
-  kind: 'unknown' | 'other' | 'manual';
+  kind: 'unknown' | 'other' | 'manual' | 'mapped';
   text: string;
 }
 
@@ -140,16 +140,17 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
   base.mode = n === 0 ? 'noflaps' : validation.ok ? 'ok' : 'incomplete';
   if (base.mode === 'incomplete') base.incompleteMessage = 'profile incomplete: open settings';
 
-  // Flap cells: one per row.
+  // Exclusion merges neighboring cells but never changes the native handle.
+  const groups=flapGroups(profile);
   if (n > 0 && validation.structureOk) {
     const current = live || link === 'paused' || link === 'nodata' ? flap.rowIndex : null;
-    base.currentRow = link === 'waiting' ? null : current;
-    base.cells = profile.flaps.map((row, i) => ({
-      label: row.label,
-      state: base.currentRow === i ? 'current' : 'other',
-    }));
+    const group=current===null?-1:groups.members.findIndex(m=>m.includes(current));
+    base.currentRow=group<0?null:group;
+    base.cells=groups.labels.map((label,i)=>({label,state:base.currentRow===i?'current':'other'}));
+    if(base.currentRow!==null&&groups.members[base.currentRow].length>1&&flap.label)
+      base.badge={kind:'mapped',text:flap.label};
   } else if (n > 0) {
-    base.cells = profile.flaps.map((row) => ({ label: row.label, state: 'other' as const }));
+    base.cells=groups.labels.map(label=>({label,state:'other'}));
   }
 
   if (link !== 'waiting') {
