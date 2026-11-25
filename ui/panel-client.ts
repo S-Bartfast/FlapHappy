@@ -27,9 +27,15 @@ const resolver = new CurrentFlapResolver();
 function xhr(method: string, path: string, body: string | null, done: (status: number, text: string) => void): void {
   const req = new XMLHttpRequest();
   req.open(method, path, true);
-  req.onreadystatechange = () => {
-    if (req.readyState === 4) done(req.status, req.responseText || '');
+  req.timeout = 1500;
+  let complete = false;
+  const finish = () => {
+    if (complete) return;
+    complete = true;
+    done(req.status, req.responseText || '');
   };
+  req.onreadystatechange = () => { if (req.readyState === 4) finish(); };
+  req.onerror = req.ontimeout = finish;
   if (body !== null) req.setRequestHeader('Content-Type', 'application/json');
   req.send(body);
 }
@@ -40,13 +46,19 @@ function postBallast(f: number): void {
   xhr('POST', '/api/ballast', JSON.stringify({ f: f }), () => undefined);
 }
 
+function waiting(): void {
+  setText(note, 'Waiting for Flap Happy…');
+  note.style.display = 'block';
+  strip.el.style.display = 'none';
+}
+
 function paint(state: CockpitState): void {
   if (!state.ready || !state.profile) {
-    setText(note, 'Waiting for Flap Happy…');
-    note.style.display = 'block';
+    waiting();
     return;
   }
   note.style.display = 'none';
+  strip.el.style.display = '';
   const profile = state.profile as Profile;
   if (profile.id !== profileId) {
     profileId = profile.id;
@@ -68,7 +80,7 @@ function paint(state: CockpitState): void {
     height: state.height === 'm' ? 'm' : 'ft',
     agl: aglFromState(state),
   });
-  strip.render(model, { profile, zoom: state.zoom, showBallast: state.showBallast !== false, showAgl: state.showAgl !== false, showTransitions: state.showTransitions === true, showWind: state.showWind !== false, barShading: state.barShading !== false });
+  strip.render(model, { profile, zoom: state.zoom, showBallast: state.showBallast !== false, showAgl: state.showAgl !== false, simpleFlap: state.simpleFlap === true, showTransitions: state.showTransitions === true, showWind: state.showWind !== false, barShading: state.barShading !== false });
   if (!holding && state.ballast !== shownBallast) {
     shownBallast = state.ballast;
     slider.render(profile, { f: state.ballast, unconfirmed: false, restored: false });
@@ -90,9 +102,9 @@ function poll(): void {
       try {
         paint(JSON.parse(text) as CockpitState);
       } catch {
-        setText(note, 'Waiting for Flap Happy…');
+        waiting();
       }
-    }
+    } else waiting();
     setTimeout(poll, 200);
   });
 }

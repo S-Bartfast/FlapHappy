@@ -25,6 +25,36 @@ async function launch(userData: string, extra: string[] = ['--source=simulated']
 }
 
 describe.skipIf(!canRun)('Electron shell (simulated source): window, files, restart', () => {
+  it('persists Simple mode and the disabled transition option through a real restart', async () => {
+    const ud = fs.mkdtempSync(path.join(os.tmpdir(), 'flaphappy-simple-e2e-'));
+    let session = await launch(ud);
+    try {
+      await session.page.click('.fh-cog');
+      const transitions = session.page.locator('.fh-show-transitions');
+      await transitions.locator('..').click();
+      expect(await transitions.isChecked()).toBe(true);
+      await session.page.locator('.fh-simple-flap').locator('..').click();
+      expect(await transitions.isDisabled()).toBe(true);
+      expect(await transitions.isChecked()).toBe(true);
+      await session.page.click('.fh-back');
+      await session.page.waitForSelector('.fh-display .fh-simple-row', { state: 'visible' });
+      await session.page.waitForTimeout(500);
+      await session.app.close();
+      const saved = JSON.parse(fs.readFileSync(path.join(ud, 'settings.json'), 'utf8'));
+      expect(saved.ui).toMatchObject({ simple_flap: true, show_transitions: true });
+      session = await launch(ud);
+      await session.page.waitForSelector('.fh-display .fh-simple-row', { state: 'visible' });
+      await session.page.click('.fh-cog');
+      expect(await session.page.locator('.fh-show-transitions').isDisabled()).toBe(true);
+      expect(await session.page.locator('.fh-show-transitions').isChecked()).toBe(true);
+      await session.page.locator('.fh-simple-flap').locator('..').click();
+      expect(await session.page.locator('.fh-show-transitions').isEnabled()).toBe(true);
+      expect(await session.page.locator('.fh-show-transitions').isChecked()).toBe(true);
+    } finally {
+      await session.app.close().catch(() => undefined);
+    }
+  });
+
   it('opens the window, builds a profile in the editor, saves real files, and restores everything after a restart', async () => {
     const ud = fs.mkdtempSync(path.join(os.tmpdir(), 'flaphappy-e2e-'));
     let { app, page } = await launch(ud);
