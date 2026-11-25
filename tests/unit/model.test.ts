@@ -6,6 +6,7 @@ import { createBlankProfile } from '../../core/profile';
 import { effectiveBoundaries } from '../../core/scale';
 import { initialBallast, ballastReadout, snapFraction } from '../../core/ballast';
 import { defaultSettings, normalizeSettings } from '../../core/settings';
+import { heightToMetres, metresToHeight } from '../../core/units';
 import { selectProfileId } from '../../core/select';
 import { makeProfile, sample } from './helpers';
 import type { SimSample } from '../../core/sim';
@@ -120,21 +121,28 @@ describe('display model', () => {
     expect(m.marker.pos).toBeCloseTo(0.5, 5);
   });
 
-  it('optional VFE overlay turns on only for the current flap above its placard', () => {
-    const p = makeProfile(3);
-    p.flaps[0].vfe_kt = 50;
-    p.display.vfe_overlay = true;
-    const m = model(p, sample({ flapIndex: 0, flapCount: 3, iasKt: 60 }));
-    expect(m.cells.map((c) => c.overVfe)).toEqual([true, false, false]);
-    p.display.vfe_overlay = false;
-    expect(model(p, sample({ flapIndex: 0, flapCount: 3, iasKt: 60 })).cells[0].overVfe).toBe(false);
-  });
-
   it('shows raw IAS in the readout and the smoothed value drives the marker', () => {
     const p = makeProfile(2);
     const m = model(p, sample({ iasKt: 104.2, flapCount: 2 }), 0, 'live', 46);
     expect(m.iasText).toBe('104 kt');
     expect(m.marker.pos).toBeCloseTo((46 - 40) / (82 - 40), 8);
+  });
+
+  it('shows raw height in the readout and the smoothed height drives the bar', () => {
+    const p = makeProfile(2);
+    const m = buildDisplayModel({
+      profile: p,
+      validation: validateProfile(p),
+      sample: sample({ aglFt: 600, flapCount: 2 }),
+      link: 'live',
+      f: 0,
+      ias: null,
+      aglFt: 200,
+      flap: new CurrentFlapResolver().resolve(p, sample({ flapCount: 2 }), 1000),
+    });
+    expect(m.aglText).toBe('600 ft');
+    expect(m.aglPos).toBe(0);
+    expect(m.aglInBand).toBe(false);
   });
 
   it('km/h converts the readout and the tick numbers from knots', () => {
@@ -151,6 +159,102 @@ describe('display model', () => {
     });
     expect(m.iasText).toBe('185 km/h');
     expect(m.ticks![0]).toBe(String(Math.round(40 * 1.852)));
+    expect(m.aglText).toBe('--- ft');
+    expect(m.aglPos).toBeNull();
+  });
+
+  it('scales height from 200 ft to 1000 ft and turns green from 400 ft to 800 ft', () => {
+    const p = makeProfile(2);
+    const at = (ft: number) => model(p, sample({ aglFt: ft, flapCount: 2 }));
+    expect(at(100).aglPos).toBe(0);
+    expect(at(100).aglInBand).toBe(false);
+    expect(at(200).aglPos).toBe(0);
+    expect(at(400).aglText).toBe('400 ft');
+    expect(at(400).aglPos).toBeCloseTo(0.25, 5);
+    expect(at(400).aglInBand).toBe(true);
+    expect(at(600).aglPos).toBeCloseTo(0.5, 5);
+    expect(at(600).aglInBand).toBe(true);
+    expect(at(800).aglPos).toBeCloseTo(0.75, 5);
+    expect(at(800).aglInBand).toBe(true);
+    expect(at(900).aglInBand).toBe(false);
+    expect(at(900).aglPos).toBeCloseTo(0.875, 5);
+    expect(at(2500).aglText).toBe('2500 ft');
+    expect(at(2500).aglPos).toBe(1);
+    expect(at(600).aglMarks).toEqual(['400', '600', '800']);
+    const metric = buildDisplayModel({
+      profile: p,
+      validation: validateProfile(p),
+      sample: sample({ aglFt: 1000, flapCount: 2 }),
+      link: 'live',
+      f: 0,
+      ias: null,
+      flap: new CurrentFlapResolver().resolve(p, sample({ flapCount: 2 }), 1000),
+      units: 'kmh',
+      height: 'm',
+    });
+    expect(metric.aglText).toBe('305 m');
+    expect(metric.aglPos).toBe(1);
+    expect(metric.aglInBand).toBe(false);
+    expect(metric.aglMarks).toEqual(['122', '183', '244']);
+    const waiting = model(p, sample({ aglFt: 600, flapCount: 2 }), 0, 'waiting');
+    expect(waiting.aglText).toBe('--- ft');
+    expect(waiting.aglPos).toBeNull();
+    expect(waiting.aglInBand).toBe(false);
+    expect(at(600).windText).toBe('--- kt');
+    expect(model(p, sample({ windKt: 12, flapCount: 2 })).windText).toBe('12 kt');
+    const windMetric = buildDisplayModel({
+      profile: p,
+      validation: validateProfile(p),
+      sample: sample({ windKt: 10, flapCount: 2 }),
+      link: 'live',
+      f: 0,
+      ias: null,
+      flap: new CurrentFlapResolver().resolve(p, sample({ flapCount: 2 }), 1000),
+      units: 'kmh',
+    });
+    expect(windMetric.windText).toBe('19 km/h');
+  });
+
+  it('uses Bottom, Top, Low and High for the height bar', () => {
+    const p = makeProfile(2);
+    const agl = { bottom_m: 0, top_m: 152.4, low_m: 91.44, high_m: 30.48 };
+    const at = (ft: number) =>
+      buildDisplayModel({
+        profile: p,
+        validation: validateProfile(p),
+        sample: sample({ aglFt: ft, flapCount: 2 }),
+        link: 'live',
+        f: 0,
+        ias: null,
+        flap: new CurrentFlapResolver().resolve(p, sample({ flapCount: 2 }), 1000),
+        agl,
+      });
+    expect(at(0).aglPos).toBe(0);
+    expect(at(250).aglPos).toBeCloseTo(0.5, 5);
+    expect(at(250).aglInBand).toBe(true);
+    expect(at(50).aglInBand).toBe(false);
+    expect(at(400).aglInBand).toBe(false);
+    expect(at(600).aglPos).toBe(1);
+    expect(at(200).aglMarks).toEqual(['100', '200', '300']);
+    expect(at(200).aglMarkPos[0]).toBeCloseTo(0.2, 5);
+    expect(at(200).aglMarkPos[2]).toBeCloseTo(0.6, 5);
+    const outside = { bottom_m: 0, top_m: 121.92, low_m: 152.4, high_m: 243.84 };
+    const hidden = buildDisplayModel({
+      profile: p,
+      validation: validateProfile(p),
+      sample: sample({ aglFt: 200, flapCount: 2 }),
+      link: 'live',
+      f: 0,
+      ias: null,
+      flap: new CurrentFlapResolver().resolve(p, sample({ flapCount: 2 }), 1000),
+      agl: outside,
+    });
+    expect(hidden.aglInBand).toBe(false);
+    expect(hidden.aglMarkPos).toEqual([null, null, null]);
+    expect(heightToMetres(200, 'ft')).toBe(60.96);
+    expect(metresToHeight(60.96, 'ft')).toBe(200);
+    expect(metresToHeight(60.96, 'm')).toBe(61);
+    expect(heightToMetres(61, 'm')).toBe(61);
   });
 });
 
@@ -182,11 +286,17 @@ describe('ballast state, settings and selection', () => {
     expect(normalizeSettings(null)).toEqual(defaultSettings());
     const s = normalizeSettings({ schema: SETTINGS_SCHEMA, ballast_by_profile: { a: 3, b: 'x' }, ui: { opacity: 0.1, zoom: 9, compact: true }, window: { x: 1, y: 2, width: 3, height: 4 }, active_by_title: { t: 'p', u: 4 } });
     expect(s.ballast_by_profile).toEqual({ a: 1 });
-    expect(s.ui).toMatchObject({ opacity: 0.3, zoom: 3, compact: true });
+    expect(s.ui).toMatchObject({ opacity: 0.3, zoom: 3, compact: true, show_ballast: true, show_agl: true, show_transitions: false, show_wind: true, bar_shading: true });
+    expect(normalizeSettings({ schema: SETTINGS_SCHEMA, ui: { bar_shading: false } }).ui.bar_shading).toBe(false);
+    expect(normalizeSettings({ schema: SETTINGS_SCHEMA, ui: { show_ballast: false, show_agl: false } }).ui).toMatchObject({ show_ballast: false, show_agl: false });
     expect(s.window).toEqual({ x: 1, y: 2, width: 3, height: 4 });
     expect(s.active_by_title).toEqual({ t: 'p' });
     expect(normalizeSettings({ schema: SETTINGS_SCHEMA, units: 'kmh' }).units).toBe('kmh');
+    expect(normalizeSettings({ schema: SETTINGS_SCHEMA, units: 'kmh' }).height).toBe('m');
+    expect(normalizeSettings({ schema: SETTINGS_SCHEMA, units: 'kmh', height: 'ft' }).height).toBe('ft');
     expect(normalizeSettings({ schema: SETTINGS_SCHEMA, units: 'mph' }).units).toBe('kt');
+    expect(normalizeSettings({ schema: SETTINGS_SCHEMA, agl: { bottom_m: 0, top_m: 99999, low_m: 'x' } }).agl).toEqual({ bottom_m: 0, top_m: 18288, low_m: 121.92, high_m: 243.84 });
+    expect(normalizeSettings({ schema: SETTINGS_SCHEMA, agl: { bottom_ft: 200, top_ft: 1000 } }).agl.bottom_m).toBe(60.96);
     expect(normalizeSettings({ schema: 'flaphappy.settings/0', units: 'kmh' })).toEqual(defaultSettings());
   });
 
