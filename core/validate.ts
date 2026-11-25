@@ -115,6 +115,7 @@ export function validateProfile(p: Profile, opts: ValidateOptions = {}): Validat
         return;
       }
       const isEnd = i === 0;
+      if(isEnd&&p.vs_min.no_ballast_kt===null&&p.vs_min.max_ballast_kt===null)return;
       const label = isEnd ? name : `${name} (${p.flaps[i - 1]?.label ?? '?'} -> ${p.flaps[i]?.label ?? '?'})`;
       const noOk = isNum(b.no[i]) && (b.no[i] as number) > 0;
       const maxOk = isNum(b.max[i]) && (b.max[i] as number) > 0;

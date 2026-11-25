@@ -313,3 +313,11 @@ describe('ballast state, settings and selection', () => {
     expect(selectProfileId([], st, 'x')).toBeNull();
   });
 });
+
+it('keeps the scale visible without stall IAS but never emits LOW from its estimated floor',()=>{
+ const p=makeProfile(4);p.vs_min={no_ballast_kt:null,max_ballast_kt:null};
+ expect(validateProfile(p).ok).toBe(true);
+ const below=model(p,sample({iasKt:30,flapCount:4}));expect(below.barVisible).toBe(true);expect(below.marker.pos).toBe(0);expect(below.alert).toBeNull();
+ expect(model(p,sample({iasKt:160,flapCount:4})).alert).toBe('FAST');
+ p.vs_min={no_ballast_kt:40,max_ballast_kt:50};expect(model(p,sample({iasKt:30,flapCount:4})).alert).toBe('LOW');
+});

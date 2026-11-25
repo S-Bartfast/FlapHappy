@@ -114,3 +114,7 @@ Everything above runs and is tested without the sim. These need a real Windows m
 6. Packaging: the portable exe starts, SmartScreen behaviour, `%APPDATA%\FlapHappy` creation, file open/save dialogs, "Open profiles folder".
 7. Cockpit panel: Settings → Window and app → **Install cockpit panel**, then restart MSFS. In the cockpit (including VR) press Tab and open **Flap Happy**. The desktop app must be running; the panel shows that same display.
 8. The `--record` trace from a real flight replays correctly with `--source=replay`.
+
+### Optional stall IAS
+
+Existing stall IAS remains authoritative when supplied. Leave both stall inputs blank to use an inferred display-only lower edge: one median gap below the first transition, clamped at zero, or zero with fewer than two transitions. This edge is not a stall speed and does not generate a LOW warning. Existing native Vne and profile file formats are unchanged.
