@@ -1,7 +1,7 @@
 import type { Profile, ValidationResult } from './types';
 import type { SimSample } from './sim';
 import type { CurrentFlap } from './flapmap';
-import { columnEdges, effectiveBoundaries, mapMarker, type MarkerRegion } from './scale';
+import { bucketIndex, columnEdges, effectiveBoundaries, mapMarker, type MarkerRegion } from './scale';
 import { aglMarkLabels, aglMarkPositions, defaultAglScale, formatAgl, formatIas, formatTick, type AglScale, type HeightUnit, type SpeedUnit } from './units';
 
 export type LinkState = 'waiting' | 'nodata' | 'paused' | 'live';
@@ -56,6 +56,7 @@ export interface DisplayModel {
   incompleteMessage: string | null;
   /** Row of the highlighted cell, or null. */
   currentRow: number | null;
+  recommendedRow:number|null;
 }
 
 export interface ModelInput {
@@ -112,6 +113,7 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
     badge: null,
     incompleteMessage: null,
     currentRow: null,
+    recommendedRow:null,
   };
   if (!profile || !validation) {
     base.incompleteMessage = 'no profile: open settings';
@@ -164,6 +166,12 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
     base.edges = columnEdges(boundaries);
     base.cellEdges = base.edges;
     base.ticks = boundaries.map((b) => formatTick(b, units));
+    // Use raw IAS for both hosts; smoothing is purely visual.
+    if(live&&validation.structureOk&&flap.status==='row'&&base.currentRow!==null&&sample&&sample.onGround!==true&&
+      sample.iasKt!==null&&isFinite(sample.iasKt)&&sample.iasKt>=GROUND_SPEED_KT){
+      const row=bucketIndex(sample.iasKt,boundaries);
+      if(row>=0&&row<base.cells.length&&row!==base.currentRow)base.recommendedRow=row;
+    }
     if (hasIas) {
       const ias = rawIas as number;
       const grey = (sample && sample.onGround === true) || ias < GROUND_SPEED_KT;

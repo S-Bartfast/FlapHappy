@@ -68,7 +68,7 @@ function paint(state: CockpitState): void {
     height: state.height === 'm' ? 'm' : 'ft',
     agl: aglFromState(state),
   });
-  strip.render(model, { profile, zoom: state.zoom, showBallast: state.showBallast !== false, showAgl: state.showAgl !== false, showTransitions: state.showTransitions === true, showWind: state.showWind !== false, barShading: state.barShading !== false });
+  strip.render(model, { profile, zoom: state.zoom, showBallast: state.showBallast !== false, showAgl: state.showAgl !== false, showTransitions: state.showTransitions === true, highlightRecommended:state.highlightRecommended===true, showWind: state.showWind !== false, barShading: state.barShading !== false });
   if (!holding && state.ballast !== shownBallast) {
     shownBallast = state.ballast;
     slider.render(profile, { f: state.ballast, unconfirmed: false, restored: false });

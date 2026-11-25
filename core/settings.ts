@@ -11,7 +11,7 @@ export function defaultSettings(): Settings {
     units: 'kt',
     height: 'ft',
     agl: defaultAglScale(),
-    ui: { compact: true, always_on_top: false, opacity: 1, zoom: 1, demo_mode: false, show_ballast: true, show_agl: true, show_transitions: false, show_wind: true, bar_shading: true },
+    ui: { compact: true, always_on_top: false, opacity: 1, zoom: 1, demo_mode: false, show_ballast: true, show_agl: true, show_transitions: false, highlight_recommended:false, show_wind: true, bar_shading: true },
     window: null,
   };
 }
@@ -68,6 +68,7 @@ export function normalizeSettings(raw: unknown): Settings {
       show_ballast: ui.show_ballast !== false,
       show_agl: ui.show_agl !== false,
       show_transitions: ui.show_transitions === true,
+      highlight_recommended: ui.highlight_recommended===true,
       show_wind: ui.show_wind !== false,
       bar_shading: ui.bar_shading !== false,
     },

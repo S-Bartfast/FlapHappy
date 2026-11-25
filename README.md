@@ -114,3 +114,6 @@ Everything above runs and is tested without the sim. These need a real Windows m
 6. Packaging: the portable exe starts, SmartScreen behaviour, `%APPDATA%\FlapHappy` creation, file open/save dialogs, "Open profiles folder".
 7. Cockpit panel: Settings → Window and app → **Install cockpit panel**, then restart MSFS. In the cockpit (including VR) press Tab and open **Flap Happy**. The desktop app must be running; the panel shows that same display.
 8. The `--record` trace from a real flight replays correctly with `--source=replay`.
+
+### Recommendation highlight
+Enable **Highlight suggested flap** in Settings to highlight the different flap band suggested by the current IAS in the full ribbon (light amber). The actual handle stays blue. It defaults off, and no highlight is shown on the ground, when the live handle/IAS or valid speeds are unavailable, outside the applicable range, or when the suggestion matches the actual band.
