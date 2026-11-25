@@ -67,6 +67,8 @@ export interface HostInfo {
   source: 'simconnect' | 'simulated' | 'replay';
   /** Show the dev control panel. */
   dev: boolean;
+  /** A main-process-owned source stays running when the desktop closes. */
+  panelOnly?: boolean;
   version: string;
   platform: string;
 }

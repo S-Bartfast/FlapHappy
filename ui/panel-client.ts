@@ -26,9 +26,15 @@ const resolver = new CurrentFlapResolver();
 function xhr(method: string, path: string, body: string | null, done: (status: number, text: string) => void): void {
   const req = new XMLHttpRequest();
   req.open(method, path, true);
-  req.onreadystatechange = () => {
-    if (req.readyState === 4) done(req.status, req.responseText || '');
+  req.timeout = 1500;
+  let completed = false;
+  const finish = () => {
+    if (completed) return;
+    completed = true;
+    done(req.status, req.responseText || '');
   };
+  req.onreadystatechange = () => { if (req.readyState === 4) finish(); };
+  req.onerror = req.ontimeout = finish;
   if (body !== null) req.setRequestHeader('Content-Type', 'application/json');
   req.send(body);
 }
@@ -41,14 +47,16 @@ function postBallast(f: number): void {
 
 function paint(state: CockpitState): void {
   if (!state.ready || !state.profile) {
-    setText(note, 'Waiting for Flap Happy…');
-    note.style.display = 'block';
+    unavailable();
     return;
   }
   note.style.display = 'none';
+  strip.el.style.display = '';
   const profile = state.profile as Profile;
   if (profile.id !== profileId) {
     profileId = profile.id;
+    shownBallast = -1;
+    holdUntil = 0;
     resolver.reset();
   }
   const now = Date.now();
@@ -80,12 +88,22 @@ function poll(): void {
       try {
         paint(JSON.parse(text) as CockpitState);
       } catch {
-        setText(note, 'Waiting for Flap Happy…');
+        unavailable();
       }
-    }
+    } else unavailable();
     setTimeout(poll, 200);
   });
 }
 
+function unavailable(): void {
+  note.style.display = 'block';
+  strip.el.style.display = 'none';
+  profileId = '';
+  shownBallast = -1;
+  holdUntil = 0;
+  resolver.reset();
+}
+
 slider.render(null, { f: 1, unconfirmed: false, restored: false });
+unavailable();
 poll();

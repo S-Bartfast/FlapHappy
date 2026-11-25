@@ -4,7 +4,7 @@ const INVOKE = new Set([
   'store:list', 'store:load', 'store:save', 'store:remove', 'store:getSettings', 'store:setSettings',
   'host:info', 'host:openJson', 'host:saveJson', 'host:setAlwaysOnTop', 'host:setOpacity', 'host:setCompact',
   'host:openProfilesFolder', 'host:quit', 'host:installPanel', 'source:start', 'source:stop', 'source:setLvar',
-  'panel:state',
+  'panel:state', 'panel:setBallast',
 ]);
 const EVENTS = new Set(['sample', 'source:log', 'panel:ballast']);
 

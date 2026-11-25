@@ -111,13 +111,20 @@ export class App {
     if (id) await this.activate(id, false);
     else this.renderAll();
 
-    this.usingSim = this.deps.info.source === 'simulated' || this.settings.ui.demo_mode || !this.deps.realSource;
+    this.usingSim = !this.deps.info.panelOnly && (this.deps.info.source === 'simulated' || this.settings.ui.demo_mode || !this.deps.realSource);
     this.startSource();
     this.applyHostSettings();
     const bridge = window.flapHappyBridge;
     if (bridge) {
       bridge.on('panel:ballast', (f) => {
         if (typeof f === 'number' && isFinite(f)) this.setBallast(f, true);
+        else if (this.deps.info.panelOnly && f && typeof f === 'object') {
+          const update = f as { profileId?: string; f?: number };
+          if (typeof update.profileId === 'string' && typeof update.f === 'number' && isFinite(update.f)) {
+            this.settings.ballast_by_profile[update.profileId] = update.f;
+            if (this.profile?.id === update.profileId) this.setBallast(update.f, true, true);
+          }
+        }
       });
     }
     setInterval(() => this.renderAll(), 500);
@@ -215,6 +222,7 @@ export class App {
   }
 
   setDemoMode(on: boolean): void {
+    if (this.deps.info.panelOnly) return;
     this.settings.ui.demo_mode = on;
     this.usingSim = on || this.deps.info.source === 'simulated' || !this.deps.realSource;
     this.startSource();
@@ -277,7 +285,8 @@ export class App {
     this.settings.last_profile_id = id;
     this.setUnsaved(null);
     this.setActiveProfile(p, true);
-    this.persistSoon();
+    if (this.deps.info.panelOnly) await this.persistNow();
+    else this.persistSoon();
   }
 
   /** Remember an edited profile until Save. Passing null clears the unsaved copy. */
@@ -304,7 +313,8 @@ export class App {
     await this.refreshMetas();
     const did = this.setActiveProfile(cloneProfile(d), false);
     this.settings.last_profile_id = d.id;
-    this.persistSoon();
+    if (this.deps.info.panelOnly) await this.persistNow();
+    else this.persistSoon();
     this.setUnsaved(null);
     return did;
   }
@@ -336,10 +346,12 @@ export class App {
     this.renderAll();
   }
 
-  setBallast(f: number, touched: boolean): void {
+  setBallast(f: number, touched: boolean, fromMain = false): void {
     this.ballast = { f: clamp01(f), unconfirmed: touched ? false : this.ballast.unconfirmed, restored: touched ? false : this.ballast.restored };
     if (this.profile) this.settings.ballast_by_profile[this.profile.id] = this.ballast.f;
-    this.persistSoon();
+    if (this.deps.info.panelOnly) {
+      if (!fromMain && this.profile) void window.flapHappyBridge?.invoke('panel:setBallast', this.profile.id, this.ballast.f).catch(e => console.error('Could not save panel ballast', e));
+    } else this.persistSoon();
     this.renderAll();
   }
 
@@ -412,6 +424,7 @@ export class App {
   // -------------------------------------------------------------- Persisting
 
   persistSoon(): void {
+    if (this.deps.info.panelOnly) { void this.persistNow().catch(e => console.error('Could not save panel settings', e)); return; }
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => void this.persistNow(), SAVE_DEBOUNCE_MS);
   }
@@ -453,7 +466,7 @@ export class App {
     setText(this.titleEl, this.profile ? profileLabel(this.profile.id) : 'Flap Happy');
     const bits: string[] = [];
     if (model.statusText) bits.push(model.statusText);
-    if (this.usingSim) bits.push('DEMO');
+    if (this.usingSim || (this.deps.info.panelOnly && this.deps.info.source !== 'simconnect')) bits.push('DEMO');
     if (model.mode === 'noflaps') bits.push('no flaps');
     setText(this.statusEl, bits.join('  |  '));
     toggleClass(this.statusEl, 'warn', model.link !== 'live');
@@ -466,7 +479,7 @@ export class App {
   /** Hand the live display to the in-sim panel. No-op in the browser harness. */
   private publishCockpit(): void {
     const bridge = window.flapHappyBridge;
-    if (!bridge) return;
+    if (!bridge || this.deps.info.panelOnly) return;
     const state: CockpitState = {
       ready: true,
       profile: this.profile,

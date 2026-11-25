@@ -8,6 +8,8 @@ import { ReplaySource, parseTraceJsonl } from '../adapters/simulated/replay-sour
 import type { DataSource, HostInfo, SimSample } from '../core/sim';
 import type { CockpitState } from '../core/cockpit';
 import type { Profile, Settings } from '../core/types';
+import { PanelRuntime } from './panel-runtime';
+import { SimulatedSource } from '../adapters/simulated/simulated-source';
 import { startPanelServer } from './panel-server';
 import { installCockpitPanel } from './panel-install';
 
@@ -33,9 +35,13 @@ let recorder: fs.WriteStream | null = null;
 let boundsTimer: ReturnType<typeof setTimeout> | null = null;
 let quitting = false;
 let cockpitState: CockpitState | null = null;
+let panelRuntime: PanelRuntime | null = null;
+let initialized = false;
+let showPending = false;
+let openingWindow: Promise<void> | null = null;
 
 function info(): HostInfo {
-  return { source: cli.source, dev: cli.dev, version: app.getVersion(), platform: process.platform };
+  return { source: cli.source, dev: cli.dev && !cli.panelOnly, panelOnly: cli.panelOnly, version: app.getVersion(), platform: process.platform };
 }
 
 function send(channel: string, payload: unknown): void {
@@ -44,8 +50,10 @@ function send(channel: string, payload: unknown): void {
 
 function startSource(): void {
   stopSource();
-  if (cli.source === 'simulated') return;
-  if (cli.source === 'replay') {
+  if (cli.source === 'simulated') {
+    if (!cli.panelOnly) return;
+    source = new SimulatedSource();
+  } else if (cli.source === 'replay') {
     if (!cli.trace) {
       send('source:log', 'Replay needs --trace=<file.jsonl>');
       return;
@@ -58,8 +66,10 @@ function startSource(): void {
   if (cli.record && !recorder) recorder = fs.createWriteStream(cli.record, { flags: 'a' });
   source.start((s: SimSample) => {
     if (recorder && s.connected) recorder.write(JSON.stringify(s) + '\n');
+    if (panelRuntime) panelRuntime.sample(s, cli.source === 'replay' ? Date.now() : s.t);
     send('sample', s);
   });
+  if (panelRuntime) source.setLvarName?.(panelRuntime.getState().profile?.current_flap.lvar_name ?? null);
 }
 
 function stopSource(): void {
@@ -117,13 +127,28 @@ async function createWindow(compact: boolean): Promise<void> {
   if (prev && !prev.isDestroyed()) prev.destroy();
 }
 
+async function showDesktop(): Promise<void> {
+  if (!initialized) { showPending = true; return; }
+  if (openingWindow) { await openingWindow; return; }
+  if (win && !win.isDestroyed()) {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    return;
+  }
+  if (!openingWindow) {
+    openingWindow = createWindow(true).finally(() => { openingWindow = null; });
+  }
+  await openingWindow;
+}
+
 function registerIpc(): void {
   ipcMain.handle('store:list', () => store.list());
   ipcMain.handle('store:load', (_e, id: string) => store.load(id));
-  ipcMain.handle('store:save', (_e, p: Profile) => store.save(p));
-  ipcMain.handle('store:remove', (_e, id: string) => store.remove(id));
-  ipcMain.handle('store:getSettings', () => store.getSettings());
-  ipcMain.handle('store:setSettings', (_e, s: Settings) => store.setSettings(s));
+  ipcMain.handle('store:save', async (_e, p: Profile) => { await store.save(p); await panelRuntime?.refresh(); });
+  ipcMain.handle('store:remove', async (_e, id: string) => { await store.remove(id); await panelRuntime?.refresh(); });
+  ipcMain.handle('store:getSettings', () => panelRuntime ? panelRuntime.settings() : store.getSettings());
+  ipcMain.handle('store:setSettings', (_e, s: Settings) => panelRuntime ? panelRuntime.updateSettings(s) : store.setSettings(s));
 
   ipcMain.handle('host:info', () => info());
   ipcMain.handle('host:openJson', async () => {
@@ -158,16 +183,20 @@ function registerIpc(): void {
     await createWindow(!!on);
   });
   ipcMain.handle('host:openProfilesFolder', () => shell.openPath(store.profilesDir));
-  ipcMain.handle('host:quit', () => app.quit());
+  ipcMain.handle('host:quit', () => { if (cli.panelOnly) win?.close(); else app.quit(); });
   ipcMain.handle('host:installPanel', () => installCockpitPanel(path.join(__dirname, 'panel', 'flaphappy-ingamepanel')));
   ipcMain.handle('panel:state', (_e, state: CockpitState) => {
-    cockpitState = state;
+    if (!cli.panelOnly) cockpitState = state;
   });
+  ipcMain.handle('panel:setBallast', (_e, profileId: string, f: number) => quitting ? false : panelRuntime?.setBallast(f, profileId));
 
-  ipcMain.handle('source:start', () => startSource());
-  ipcMain.handle('source:stop', () => stopSource());
+  ipcMain.handle('source:start', () => {
+    if (!cli.panelOnly) startSource();
+    else if (panelRuntime?.getState().sample) send('sample', panelRuntime.getState().sample);
+  });
+  ipcMain.handle('source:stop', () => { if (!cli.panelOnly) stopSource(); });
   ipcMain.handle('source:setLvar', (_e, name: string | null) => {
-    if (source && source.setLvarName) source.setLvarName(name);
+    if (!cli.panelOnly && source && source.setLvarName) source.setLvarName(name);
   });
 }
 
@@ -191,28 +220,58 @@ async function smokeAndCapture(): Promise<void> {
   app.quit();
 }
 
-if (!app.requestSingleInstanceLock() && !cli.userData) {
+const haveLock = app.requestSingleInstanceLock();
+if (!haveLock || cli.quit) {
   app.quit();
 } else {
+  app.on('second-instance', (_event, argv) => {
+    const requested = parseCli(argv);
+    if (requested.quit) { app.quit(); return; }
+    if (quitting || requested.panelOnly) return;
+    void showDesktop().catch(e => console.error('Could not open Flap Happy', e));
+  });
   app.whenReady().then(async () => {
     store = new FileProfileStore(app.getPath('userData'));
     await store.getSettings();
     registerIpc();
+    if (cli.panelOnly) {
+      panelRuntime = new PanelRuntime(store, (name) => source?.setLvarName?.(name), (profileId, f) => send('panel:ballast', { profileId, f }));
+      await panelRuntime.initialize();
+    }
     try {
       await startPanelServer({
         root: path.join(__dirname, 'renderer'),
         version: app.getVersion(),
-        getState: () => cockpitState,
-        onBallast: (f) => send('panel:ballast', f),
+        getState: () => panelRuntime ? panelRuntime.getState() : cockpitState,
+        onBallast: async (f) => {
+          if (quitting) return false;
+          if (panelRuntime) return panelRuntime.setBallast(f);
+          send('panel:ballast', f);
+        },
       });
     } catch (e) {
       console.error('Cockpit panel server did not start', e);
+      if (cli.panelOnly) { app.exit(1); return; }
     }
-    await createWindow(true);
-    if (cli.smoke || cli.screenshot) void smokeAndCapture();
+    initialized = true;
+    if (cli.panelOnly) {
+      startSource();
+      if (showPending) await showDesktop();
+    } else {
+      await showDesktop();
+      if (cli.smoke || cli.screenshot) void smokeAndCapture();
+    }
   });
-  app.on('window-all-closed', () => app.quit());
-  app.on('before-quit', () => {
+  app.on('window-all-closed', () => { if (!cli.panelOnly) app.quit(); });
+  app.on('before-quit', (event) => {
+    if (panelRuntime && !quitting) {
+      // Drain queued preference writes before a panel-only session exits.
+      event.preventDefault();
+      quitting = true;
+      stopSource();
+      void panelRuntime.flush().finally(() => app.quit());
+      return;
+    }
     quitting = true;
     stopSource();
     if (recorder) recorder.end();
