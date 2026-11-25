@@ -54,6 +54,73 @@ Native Flap Happy field mapping (profile schema flaphappy.profile/3):
   valid native import. Match ordered native flap handles and visibility rules
   separately; do not fill missing Vs or map published TAS VNE to vne_ms IAS.
 
+PROPOSED LANDING-FLAP STALL IAS - EXPERIMENTAL, NOT PUBLISHED
+-------------------------------------------------------------
+
+These are proposed simulator-only starter values for review, separate from the
+revision-16 published snapshot below. They have not been observed in MSFS or
+published to WSG.org by this document. The intended reference is the most-positive
+physical landing flap listed in the exact variant mapping, even if its divider is
+excluded from the in-flight ribbon. The weights are the existing WSG loaded
+Light/Heavy profile endpoints, not empty weight or generic model limits. Values
+are IAS, not TAS, and are approximate adaptations of real-aircraft landing-flap
+references where applicable; they are not approved speeds for any real aircraft.
+Use only for simulator testing and refine against the actual named MSFS add-on.
+
+The proposed km/h inputs are rounded to integer hundredths of m/s for WSG storage:
+    stored = round_half_up(IAS_km/h / 3.6 * 100)
+The corresponding native Flap Happy decimal m/s fields are stored / 100.
+A published catalog would still transmit the applicable IAS in knots. For
+example, 71 km/h -> 1972 -> 19.72 m/s -> 70.992 km/h after quantization.
+
+Variant          | Weight kg L/H | Landing (idx)    | Proposed IAS km/h L/H | Stored m/s x100 L/H | Native m/s L/H
+AS33-15-GF       | 475/550       | L (7)            | 71/82                 | 1972/2278           | 19.72/22.78
+AS33-18-GF       | 485/600       | L (7)            | 67/74                 | 1861/2056           | 18.61/20.56
+AS33-18-MD       | 485/600       | L (7)            | 67/74                 | 1861/2056           | 18.61/20.56
+DG808S-18-TC     | 427/600       | L (6)            | 68/81                 | 1889/2250           | 18.89/22.50
+JS3-15-BC        | 366/525       | L (5)            | 73/86                 | 2028/2389           | 20.28/23.89
+JS3-15-MD        | 415/525       | L (5)            | 78/86                 | 2167/2389           | 21.67/23.89
+JS3-18-BC        | 378/600       | L (5)            | 69/88                 | 1917/2444           | 19.17/24.44
+JS3-18-MD        | 430/600       | L (5)            | 74/88                 | 2056/2444           | 20.56/24.44
+L13-TC           | 372/500       | Full (2)         | 49/57                 | 1361/1583           | 13.61/15.83
+S12G-GF          | 780/900       | L (5)            | 74/80                 | 2056/2222           | 20.56/22.22
+SZD562-15-61T    | 312/500       | 28° (6)          | 72/84                 | 2000/2333           | 20.00/23.33
+
+Diana 2 (SZD562-15-61T) - one proposed hidden transition correction:
+  28 degrees -> 21 degrees, native indices 6 -> 5, Light only:
+    published revision 16: 1972 = 19.72 m/s = 70.992 km/h IAS
+    proposed:              2056 = 20.56 m/s = 74.016 km/h IAS
+  Heavy remains 2528 = 25.28 m/s = 91.008 km/h IAS. Visibility remains Excluded.
+  This keeps the proposed 72 km/h Light landing stall below the hidden transition,
+  and the hidden transition below the next published 75.996 km/h Light threshold.
+  No other transition or visibility change is proposed here. The snapshot below
+  intentionally retains the original revision-16 numbers.
+
+Source context and uncertainty (real-aircraft references, not validation of the
+MSFS implementations; these are the proposed WSG simulator starting values):
+  AS 33: Schleicher AS 33 Es flight manual, section 5.2.2. Adapted to the
+    corresponding 15 m / 18 m WSG weight endpoints and add-on variants.
+    https://www.a-glider-for-renting.com/Dedicated/pdf/AS-33%20D-KTJL%20Flight%20Manual.pdf
+  JS3: Jonker JS-MD 3 RES flight manual, section 5.2.2 (different exact aircraft
+    configurations; related-family proxy for the B21-CalVR and MADolo add-ons).
+    https://jonker-sailplanes.com/wp-content/uploads/2026/05/MD11-AFM-00-001-I01-R02_JS-MD-3-RES-Powered-Aircraft-Flight-Manual_signed_compressed.pdf#page=89
+  DG-808S: weakest approximation. DG-800S 18 m landing-flap table in section
+    5.2.2 gives 66 and 69 km/h at 400 and 440 kg; the proposed 427 kg value is
+    an interpolation estimate, and 600 kg extrapolates above its 525 kg endpoint
+    (76 km/h). This is not the exact DG-808S model or validated sim ballast curve.
+    https://pesee-centrage.fr/wp-content/uploads/2024/01/Flight_Manual_DG800S.pdf
+  L-13 Blanik: published flight manual linked by Touching Cloud; phase-oriented
+    flaps and loaded weights must be verified in the named add-on.
+    https://msfs.touching.cloud/wp-content/uploads/2025/12/l-13_blanik_flight_manual.pdf
+  Stemme S12-G: real S12 AFM, page 5-4; the add-on manual gives a generic full
+    flap 74 km/h but no matching weight anchor. The proposed 780/900 kg pair is
+    not a verified measurement of the GotFriends model.
+    https://www.creatrix-ideas.de/wp-content/uploads/L400_912810_00_I2_Aircraft-Flight-Manual-S12.pdf
+    https://flightsimulator.azureedge.net/wp-content/uploads/2024/11/Stemme_S12G_Manual_v3.pdf#page=6
+  Diana 2: flight manual, section 5.2.2 (landing flaps). The proposed stall
+    pair and the hidden trigger correction still need simulator validation.
+    https://ru.scribd.com/document/536158159/FM-Diana2-iss1-March2006-pelna
+
 PUBLISHED VARIANT TABLES
 ------------------------
 
