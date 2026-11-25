@@ -1,5 +1,5 @@
 import { lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmdirSync, unlinkSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -72,6 +72,17 @@ function activePanels(roots:string[],target?:string):string[]{
   }
   return result;
 }
+/** Windows Store packages may resolve through WpSystem, whose top-level ACL
+ * can prevent probing a hypothetical manifest even though the user's own
+ * LocalCache/Packages/Community is accessible. This exception is restricted to
+ * the system ancestor of a detected MSFS 2024 default Community. All actual
+ * package parents, package payloads, and custom destinations remain checked. */
+function protectedStoreAncestor(current:string,parent:string,error:unknown):boolean{
+  if(process.platform!=='win32'||basename(current).toLowerCase()!=='wpsystem')return false;
+  const code=(error as NodeJS.ErrnoException|null)?.code;
+  if(code!=='UNKNOWN'&&code!=='EACCES'&&code!=='EPERM')return false;
+  return /^S-1-\d+(?:-\d+)+\/AppData\/Local\/Packages\/Microsoft\.Limitless_8wekyb3d8bbwe\/LocalCache\/Packages\/Community(?:2024)?$/i.test(slash(relative(current,parent)));
+}
 type Inspection={status:PanelInstallStatus;targetParent:string|null;bundleFiles:Set<string>};
 function inspect(bundle:string,input:PanelDestination,detected:string|null):Inspection {
   const choice=normalizeInstallDestination(input,detected),roots=physicalCommunities(detected);
@@ -89,8 +100,16 @@ function inspect(bundle:string,input:PanelDestination,detected:string|null):Insp
   if(choice.kind==='custom'&&!same(parent,selected))return unavailable('conflict','Select the actual physical custom package parent, not a redirected path.');
   if(choice.kind==='custom'&&roots.some(root=>beneath(root,parent)))return unavailable('conflict','Choose a custom package parent outside Community.');
   if(beneath(bundle,parent)||same(join(parent,PACKAGE_NAME),bundle))return unavailable('conflict','The bundled package cannot be an installation target.');
-  // Do not nest a package within an existing package tree.
-  for(let current=parent;;current=dirname(current)){if(lstat(join(current,'manifest.json')))return unavailable('conflict','Select a package parent, not a folder inside another package.');if(dirname(current)===current)break;}
+  // Do not nest a package within an existing package tree. A detected
+  // Windows Store Community can sit below an inaccessible system ancestor,
+  // which is not itself an add-on package parent.
+  for(let current=parent;;current=dirname(current)){
+    let existingManifest;
+    try{existingManifest=lstat(join(current,'manifest.json'));}
+    catch(e){if(choice.kind!=='community'||!protectedStoreAncestor(current,parent,e))throw e;}
+    if(existingManifest)return unavailable('conflict','Select a package parent, not a folder inside another package.');
+    if(dirname(current)===current)break;
+  }
   const target=join(parent,PACKAGE_NAME);status.target=target;active=activePanels(roots,target);
   if(active.length>1)return unavailable('conflict','Flap Happy is present more than once in Community. Resolve the duplicate manually.');
   if(roots.length){status.linked=false;for(const item of active){const st=lstat(item)!;
