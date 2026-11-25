@@ -1,5 +1,5 @@
 import { SETTINGS_SCHEMA, type Settings } from './types';
-import type { SpeedUnit } from './units';
+import { defaultAglScale, feetToMetres, roundMetres, type SpeedUnit } from './units';
 import { clamp01 } from './profile';
 
 export function defaultSettings(): Settings {
@@ -9,7 +9,9 @@ export function defaultSettings(): Settings {
     active_by_title: {},
     ballast_by_profile: {},
     units: 'kt',
-    ui: { compact: true, always_on_top: false, opacity: 1, zoom: 1, demo_mode: false, external_panel_on_launch: false },
+    height: 'ft',
+    agl: defaultAglScale(),
+    ui: { compact: true, always_on_top: false, opacity: 1, zoom: 1, demo_mode: false, external_panel_on_launch: false, show_ballast: true, show_agl: true, show_transitions: false, show_wind: true, bar_shading: true },
     window: null,
     main_window: null,
   };
@@ -40,12 +42,25 @@ export function normalizeSettings(raw: unknown): Settings {
   const num = (x: unknown, def: number, lo: number, hi: number) =>
     typeof x === 'number' && isFinite(x) ? Math.max(lo, Math.min(hi, x)) : def;
   const units: SpeedUnit = r.units === 'kmh' ? 'kmh' : 'kt';
+  const height = r.height === 'm' || r.height === 'ft' ? r.height : units === 'kmh' ? 'm' : 'ft';
+  const aglIn = obj(r.agl);
+  const aglM = (m: unknown, ft: unknown, def: number) => {
+    const n = typeof m === 'number' && isFinite(m) ? m : typeof ft === 'number' && isFinite(ft) ? feetToMetres(ft) : def;
+    return Math.max(0, Math.min(18288, roundMetres(n)));
+  };
   return {
     schema: SETTINGS_SCHEMA,
     last_profile_id: typeof r.last_profile_id === 'string' ? r.last_profile_id : null,
     active_by_title: byTitle,
     ballast_by_profile: ballast,
     units,
+    height,
+    agl: {
+      bottom_m: aglM(aglIn.bottom_m, aglIn.bottom_ft, d.agl.bottom_m),
+      top_m: aglM(aglIn.top_m, aglIn.top_ft, d.agl.top_m),
+      low_m: aglM(aglIn.low_m, aglIn.low_ft, d.agl.low_m),
+      high_m: aglM(aglIn.high_m, aglIn.high_ft, d.agl.high_m),
+    },
     ui: {
       compact: true,
       always_on_top: ui.always_on_top === true,
@@ -53,6 +68,11 @@ export function normalizeSettings(raw: unknown): Settings {
       zoom: num(ui.zoom, d.ui.zoom, 0.5, 3),
       demo_mode: ui.demo_mode === true,
       external_panel_on_launch: ui.external_panel_on_launch === true,
+      show_ballast: ui.show_ballast !== false,
+      show_agl: ui.show_agl !== false,
+      show_transitions: ui.show_transitions === true,
+      show_wind: ui.show_wind !== false,
+      bar_shading: ui.bar_shading !== false,
     },
     window: bounds(r.window),
     main_window: bounds(r.main_window),

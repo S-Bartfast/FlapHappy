@@ -85,14 +85,13 @@ describe('validateProfile', () => {
     expect(validateProfile(p).structureOk).toBe(false);
   });
 
-  it('warns about long labels, direction, VFE, many rows, out-of-range indices', () => {
+  it('warns about long labels, direction, many rows, out-of-range indices', () => {
     const p = makeProfile(11);
     p.flaps[0].label = 'abcde';
-    p.flaps[1].vfe_kt = 45;
     p.transitions[3].max_ballast_kt = (p.transitions[3].no_ballast_kt as number) - 0; // equal: not a direction warning
     p.handle_count = 5;
     const w = validateProfile(p).warnings.map((x) => x.code);
-    expect(w).toEqual(expect.arrayContaining(['label-long-warn', 'above-vfe', 'many-rows', 'index-range']));
+    expect(w).toEqual(expect.arrayContaining(['label-long-warn', 'many-rows', 'index-range']));
     const q = makeProfile(3);
     q.transitions[0].max_ballast_kt = 40;
     expect(validateProfile(q).warnings.map((x) => x.code)).toContain('ballast-direction');

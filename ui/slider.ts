@@ -26,8 +26,7 @@ export class BallastSlider {
       'div',
       { class: 'fh-row fh-ballast-row' },
       h('div', { class: 'fh-label' }, 'BALLAST'),
-      h('div', { class: 'fh-sl' }, h('div', { class: 'fh-sl-trackwrap' }, this.track)),
-      h('div', { class: 'fh-gr fh-sl-read' }, this.readout),
+      h('div', { class: 'fh-sl' }, h('div', { class: 'fh-sl-trackwrap' }, this.track), h('div', { class: 'fh-sl-read' }, this.readout)),
     );
 
     const move = (clientX: number) => {

@@ -3,6 +3,7 @@ import type { Profile } from '../core/types';
 import { validateProfile } from '../core/validate';
 import { CurrentFlapResolver } from '../core/flapmap';
 import { buildDisplayModel, deriveLink } from '../core/display-model';
+import type { AglScale } from '../core/units';
 import { h, setText } from './dom';
 import { StripView } from './strip';
 import { BallastSlider } from './slider';
@@ -72,14 +73,23 @@ function paint(state: CockpitState): void {
     ias: state.sample ? state.sample.iasKt : null,
     flap: resolver.resolve(profile, state.sample, now),
     units: state.units === 'kmh' ? 'kmh' : 'kt',
+    height: state.height === 'm' ? 'm' : 'ft',
+    agl: aglFromState(state),
   });
-  strip.render(model, { profile, zoom: state.zoom });
+  strip.render(model, { profile, zoom: state.zoom, showBallast: state.showBallast !== false, showAgl: state.showAgl !== false, showTransitions: state.showTransitions === true, showWind: state.showWind !== false, barShading: state.barShading !== false });
   if (!holding && state.ballast !== shownBallast) {
     shownBallast = state.ballast;
     slider.render(profile, { f: state.ballast, unconfirmed: false, restored: false });
   } else if (holding) {
     slider.render(profile, { f: shownBallast, unconfirmed: false, restored: false });
   }
+}
+
+function aglFromState(state: CockpitState): AglScale | undefined {
+  const agl = state.agl;
+  if (!agl) return undefined;
+  if (typeof agl.bottom_m !== 'number' || typeof agl.top_m !== 'number' || typeof agl.low_m !== 'number' || typeof agl.high_m !== 'number') return undefined;
+  return agl;
 }
 
 function poll(): void {

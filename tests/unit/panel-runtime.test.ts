@@ -49,6 +49,12 @@ describe('main-process panel session', () => {
     await runtime.refresh();
     expect(runtime.getState()).toMatchObject({ profile: { id: next.id }, receivedAt: 1300, ballast: next.ballast.default_fraction });
     expect(setLvar).toHaveBeenCalledWith('Flap test');
+    const changedSettings=await runtime.settings();
+    changedSettings.height='m';changedSettings.agl={bottom_m:10,top_m:500,low_m:100,high_m:300};
+    changedSettings.ui.show_agl=false;changedSettings.ui.show_wind=false;changedSettings.ui.show_transitions=true;changedSettings.ui.bar_shading=false;
+    await runtime.updateSettings(changedSettings);
+    runtime.sample(sample({aircraftTitle:'second',aglFt:600,windKt:17}),1400);
+    expect(runtime.getState()).toMatchObject({height:'m',agl:changedSettings.agl,showAgl:false,showWind:false,showTransitions:true,barShading:false,sample:{aglFt:600,windKt:17}});
     expect((await runtime.settings()).last_profile_id).toBe(next.id);
     expect((await runtime.settings()).ballast_by_profile[p.id]).toBe(0.75);
   });

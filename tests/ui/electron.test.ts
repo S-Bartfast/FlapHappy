@@ -222,6 +222,28 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
     }
   });
 
+  it('uses upstream AGL and wind settings in the shared external and cockpit panel after main-process reconciliation',async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-agl-panel-'));
+    const {app,page}=await launch(ud);let browser:import('playwright-core').Browser|undefined;
+    try{
+      const panel=await openExternal(app,page);
+      const {chromium}=await import('playwright-core');
+      const executablePath=[process.env.CHROME_PATH,'C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','/usr/bin/chromium','/usr/bin/google-chrome'].find(p=>p&&fs.existsSync(p));
+      browser=await chromium.launch({executablePath,args:['--no-sandbox']});const cockpit=await browser.newPage();await cockpit.goto(panelUrl+'/panel.html');
+      await page.evaluate(()=>{const a=(window as any).__flapHappy.app;const sim=(window as any).__flapHappy.sim;sim.controls.aglFt=600;sim.controls.windKt=17;sim.tick(0);a.setHeightUnit('m');a.setAglEdge('top_m',450);});
+      await waitUntil(async()=>{const feed=await getFeed();return feed.height==='m'&&feed.agl.top_m===450&&feed.sample?.aglFt===600&&feed.sample?.windKt===17;},'metric AGL and wind feed');
+      for(const host of [panel,cockpit]){
+        await host.waitForFunction(()=>document.querySelector('.fh-aglread')?.textContent?.includes('183 m')&&document.querySelector('.fh-aglwindtext')?.textContent?.includes('17 kt'),{}, {polling:100,timeout:10000});
+      }
+      await page.click('.fh-main-settings');await page.waitForSelector('.fh-show-agl');await page.locator('.fh-show-agl').locator('..').click();
+      await waitUntil(async()=> (await getFeed()).showAgl===false,'AGL setting reaches session');
+      for(const host of [panel,cockpit])await host.waitForFunction(()=>!document.querySelector<HTMLElement>('.fh-agl-row')?.offsetHeight,{}, {polling:100,timeout:10000});
+      await page.locator('.fh-show-agl').locator('..').click();await page.locator('.fh-show-wind').locator('..').click();
+      await waitUntil(async()=>{const f=await getFeed();return f.showAgl===true&&f.showWind===false;},'wind setting reaches session');
+      for(const host of [panel,cockpit])await host.waitForFunction(()=>!!document.querySelector<HTMLElement>('.fh-agl-row')?.offsetHeight&&!document.querySelector<HTMLElement>('.fh-aglwind')?.offsetHeight,{}, {polling:100,timeout:10000});
+    }finally{await browser?.close();await app.close();fs.rmSync(ud,{recursive:true,force:true});}
+  });
+
   it('replay records real source samples and the cockpit panel follows changing flap positions', async () => {
     const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-e2e-'));
     fs.mkdirSync(path.join(ud,'profiles'),{recursive:true});

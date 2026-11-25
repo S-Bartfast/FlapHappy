@@ -17,7 +17,7 @@ You need either the portable exe or a folder with these files plus Node.js.
 2. Double-click **`Start Flap Happy.bat`**. The first run downloads the components (a few minutes), then the window opens.
 3. No simulator handy? Double-click **`Start Flap Happy (demo, no sim).bat`**. It runs on fake data with a control panel so you can try everything.
 
-With MSFS 2024: start the sim first or after, either works. Flap Happy reconnects by itself. The desktop window is compact, so the "Waiting for MSFS..." status line is hidden; the bar fills in once the sim is sending data. SimConnect needs no configuration or extra files; it connects over the sim's local connection.
+With MSFS 2024: start the sim first or after, either works. Flap Happy reconnects by itself. The main window shows connection status; the optional ribbon fills in once the sim is sending data. SimConnect needs no configuration or extra files; it connects over the sim's local connection.
 
 ### Main window and optional external panel
 
@@ -35,7 +35,7 @@ A second launch (or `--show`) restores the existing main window; `--quit` exits 
 The previous experimental windowless launch flag is no longer a windowless mode.
 
 ### First use
-1. Click the cog (top right) to open the settings.
+1. Click Settings and profiles in the main window.
 2. A new install, or an empty profile folder, gets **AS33-18m**, **AS33-15m**, and **JS3**. AS33-18m opens first. Profiles already in the folder are not copied again.
 3. Close the settings. If needed, open the external panel or use the in-sim panel and set the ballast slider.
 
@@ -68,7 +68,7 @@ Command line flags (after `npm start --` or on the exe):
 | `--trace=file.jsonl` `--speed=2` `--loop` | replay a trace (with `--source=replay`) |
 | `--protocol=SunRise\|KittyHawk\|FSX_SP2\|FSX_SP1` | SimConnect protocol (default `SunRise`, MSFS 2024) |
 | `--user-data=<dir>` | use another folder instead of `%APPDATA%\FlapHappy` |
-| `--compact` | accepted; the window is always the compact frameless layout |
+| `--compact` | accepted for compatibility; the main window always stays framed |
 
 A sample trace is in `tests/fixtures/sample-trace.jsonl`. `--record` is how you capture a real flight to replay later (useful for bug reports).
 
@@ -104,7 +104,7 @@ The desktop UI talks to three adapter interfaces (data, profiles, and host). The
 Coherent-safe rules, enforced by `npm run lint:coherent` and by compiling the renderer to ES2015 and checking it with es-check: flexbox and absolute positioning only (no grid, `gap`, CSS variables), no `ResizeObserver`, `localStorage`, `fetch`, clipboard, pointer events, `Object.entries`, `padStart`; mouse and touch events only.
 
 ### Profiles in brief
-A profile has N flap rows (any N from 0 up; each row: label, a sim index you type in, and VFE) and exactly N-1 transitions, plus Vs and Vne. Saved speeds are metres per second to two decimal places; the display converts them to whole kt or km/h. The ballast slider interpolates stall and transition speeds between the two ends. VNE is one speed, saved as `vne_ms`. Validation (inline, with a summary box) requires strictly ascending speeds at both ballast ends; buckets narrower than 4 kt warn, narrower than 2 kt are errors. The display shows an error/incomplete message instead of misleading data when a profile is not valid.
+A profile has N flap rows (any N from 0 up; each row: label and a sim index you type in) and exactly N-1 transitions, plus Vs and Vne. Saved speeds are metres per second to two decimal places; the display converts them to whole kt or km/h. The ballast slider interpolates stall and transition speeds between the two ends. VNE is one speed, saved as `vne_ms`. Validation (inline, with a summary box) requires strictly ascending speeds at both ballast ends; buckets narrower than 4 kt warn, narrower than 2 kt are errors. The display shows an error/incomplete message instead of misleading data when a profile is not valid.
 
 ## Choices and deviations worth knowing
 - Schema ids are `flaphappy.profile/3` and `flaphappy.settings/1`. Files with another schema id are rejected.

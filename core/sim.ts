@@ -5,6 +5,10 @@ export interface SimSample {
   connected: boolean;
   inFlight: boolean;
   iasKt: number | null;
+  /** Height above the ground, in feet. `PLANE ALT ABOVE GROUND`. */
+  aglFt: number | null;
+  /** Ambient wind speed, in knots. `AMBIENT WIND VELOCITY`. */
+  windKt: number | null;
   onGround: boolean | null;
   flapIndex: number | null;
   flapCount: number | null;
@@ -21,6 +25,8 @@ export function emptySample(t = 0): SimSample {
     connected: false,
     inFlight: false,
     iasKt: null,
+    aglFt: null,
+    windKt: null,
     onGround: null,
     flapIndex: null,
     flapCount: null,

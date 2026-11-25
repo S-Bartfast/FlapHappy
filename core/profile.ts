@@ -56,7 +56,6 @@ export function createBlankProfile(id = 'new-profile'): Profile {
     current_flap: defaultCurrentFlap(),
     marker_smoothing_ms: 300,
     bank_scaling: 'off',
-    display: { vfe_overlay: false },
     source: 'user',
     notes: '',
   };
@@ -105,13 +104,10 @@ function normSpeed(x: unknown): Speed {
 function normFlap(x: unknown): FlapPosition {
   const r = isObj(x) ? x : {};
   const hi = r.handle_index;
-  const out: FlapPosition = {
+  return {
     label: strOr(r.label, ''),
     handle_index: typeof hi === 'number' && isFinite(hi) ? hi : null,
   };
-  const v = fileSpeed(r.vfe_ms);
-  if (v !== null) out.vfe_kt = v;
-  return out;
 }
 
 export interface ParseResult {
@@ -152,7 +148,6 @@ export function normalizeProfile(input: unknown): ParseResult {
   const ballastIn = isObj(r.ballast) ? r.ballast : {};
   const cfIn = isObj(r.current_flap) ? r.current_flap : {};
   const matchIn = isObj(r.match) ? r.match : {};
-  const displayIn = isObj(r.display) ? r.display : {};
   const autoIn = isObj(ballastIn.auto) ? stripUnderscore(ballastIn.auto) : {};
   const src = cfIn.source;
 
@@ -185,7 +180,6 @@ export function normalizeProfile(input: unknown): ParseResult {
     },
     marker_smoothing_ms: Math.max(0, numOr(r.marker_smoothing_ms, 300)),
     bank_scaling: 'off',
-    display: { vfe_overlay: displayIn.vfe_overlay === true },
     source: r.source === 'preset' ? 'preset' : 'user',
     notes: strOr(r.notes, ''),
   };
@@ -216,9 +210,7 @@ function speedToFile(s: Speed): { no_ballast_ms: number | null; max_ballast_ms: 
 }
 
 function flapToFile(f: FlapPosition): Raw {
-  const out: Raw = { label: f.label, handle_index: f.handle_index };
-  if (typeof f.vfe_kt === 'number') out.vfe_ms = knotsToMs(f.vfe_kt);
-  return out;
+  return { label: f.label, handle_index: f.handle_index };
 }
 
 /** Saved profile text. Speeds are metres per second. */
@@ -237,7 +229,6 @@ export function exportProfileJson(p: Profile): string {
     current_flap: p.current_flap,
     marker_smoothing_ms: p.marker_smoothing_ms,
     bank_scaling: p.bank_scaling,
-    display: { vfe_overlay: p.display.vfe_overlay },
     source: p.source,
     notes: p.notes,
   };
@@ -296,7 +287,6 @@ export function newRow(p: Profile, partial?: Partial<FlapPosition>): FlapPositio
   return {
     label: partial?.label ?? nextFreeLabel(p),
     handle_index: partial && partial.handle_index !== undefined ? partial.handle_index : null,
-    ...(partial?.vfe_kt !== undefined && partial.vfe_kt !== null ? { vfe_kt: partial.vfe_kt } : {}),
   };
 }
 
