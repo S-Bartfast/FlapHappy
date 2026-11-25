@@ -1,7 +1,7 @@
 import type { Profile } from './types';
 import type { SimSample } from './sim';
 
-/** Live display state published by the active desktop or panel-only session. */
+/** Live display state published by the main process for the shared in-sim and external display. */
 export interface CockpitState {
   ready: boolean;
   profile: Profile | null;

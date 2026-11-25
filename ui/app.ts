@@ -1,5 +1,4 @@
 import type { DataSource, Host, HostInfo, ProfileStore, SimSample } from '../core/sim';
-import type { CockpitState } from '../core/cockpit';
 import type { Profile, ProfileMeta, Settings, ValidationResult } from '../core/types';
 import { validateProfile } from '../core/validate';
 import { CurrentFlapResolver, type CurrentFlap } from '../core/flapmap';
@@ -47,8 +46,11 @@ export class App {
   private resolver = new CurrentFlapResolver();
   private smoothIas: number | null = null;
   private smoothAt = 0;
-  private strip!: StripView;
-  private slider!: BallastSlider;
+  private strip?: StripView;
+  private slider?: BallastSlider;
+  private externalBtn: HTMLButtonElement | null = null;
+  private launchCheck: HTMLInputElement | null = null;
+  private externalOpen = false;
   private displayView!: HTMLElement;
   private statusEl!: HTMLElement;
   private titleEl!: HTMLElement;
@@ -111,14 +113,14 @@ export class App {
     if (id) await this.activate(id, false);
     else this.renderAll();
 
-    this.usingSim = !this.deps.info.panelOnly && (this.deps.info.source === 'simulated' || this.settings.ui.demo_mode || !this.deps.realSource);
+    this.usingSim = this.deps.info.source === 'simulated' || this.settings.ui.demo_mode || !this.deps.realSource;
     this.startSource();
     this.applyHostSettings();
     const bridge = window.flapHappyBridge;
     if (bridge) {
       bridge.on('panel:ballast', (f) => {
         if (typeof f === 'number' && isFinite(f)) this.setBallast(f, true);
-        else if (this.deps.info.panelOnly && f && typeof f === 'object') {
+        else if (this.deps.info.mainWindow && f && typeof f === 'object') {
           const update = f as { profileId?: string; f?: number };
           if (typeof update.profileId === 'string' && typeof update.f === 'number' && isFinite(update.f)) {
             this.settings.ballast_by_profile[update.profileId] = update.f;
@@ -126,6 +128,11 @@ export class App {
           }
         }
       });
+    }
+    if (this.deps.info.mainWindow && bridge) {
+      bridge.on('host:externalPanel', value => { this.externalOpen = value === true; this.paintExternal(); });
+      this.externalOpen = await this.host.getExternalPanel?.() ?? false;
+      this.paintExternal();
     }
     setInterval(() => this.renderAll(), 500);
     if (!this.profile) this.openSettings();
@@ -138,8 +145,10 @@ export class App {
     clear(root);
     root.className = 'fh-root' + (this.deps.compact ? ' fh-compact' : '');
 
-    this.slider = new BallastSlider((f) => this.setBallast(f, true));
-    this.strip = new StripView({ ballastRow: this.slider.el });
+    if (!this.deps.info.mainWindow) {
+      this.slider = new BallastSlider((f) => this.setBallast(f, true));
+      this.strip = new StripView({ ballastRow: this.slider.el });
+    }
     this.titleEl = h('div', { class: 'fh-title' }, 'Flap Happy');
     this.statusEl = h('div', { class: 'fh-status' });
 
@@ -148,17 +157,32 @@ export class App {
 
     const caps = this.deps.host.capabilities;
     const buttons: HTMLElement[] = [];
-    if (caps.alwaysOnTop) {
+    if (caps.alwaysOnTop && !this.deps.info.mainWindow) {
       this.pinBtn = iconBtn('PIN', 'Keep window on top', () => this.toggleAlwaysOnTop(), 'fh-pin');
       buttons.push(this.pinBtn);
     }
     this.saveBtn = h('button', { class: 'fh-btn fh-save', type: 'button', title: 'Save profile', disabled: true, onclick: () => void this.saveProfile() }, 'Save') as HTMLButtonElement;
     buttons.push(this.saveBtn);
-    buttons.push(iconBtn('\u2699', 'Settings', () => this.openSettings(), 'fh-cog'));
+    if (!this.deps.info.mainWindow) buttons.push(iconBtn('\u2699', 'Settings', () => this.openSettings(), 'fh-cog'));
     if (this.deps.compact && caps.compact) buttons.push(iconBtn('\u00d7', 'Close', () => this.deps.host.quit(), 'fh-close'));
 
     const header = h('div', { class: 'fh-header' }, h('div', { class: 'fh-head-text' }, this.titleEl, this.statusEl), h('div', { class: 'fh-head-btns' }, ...buttons));
-    this.displayView = h('div', { class: 'fh-display' }, header, this.strip.el);
+    if (this.deps.info.mainWindow) {
+      this.externalBtn = h('button', { class: 'fh-btn fh-external-toggle', type: 'button', onclick: () => void this.toggleExternal() }, 'Show external panel') as HTMLButtonElement;
+      this.launchCheck = h('input', { class: 'fh-external-launch', type: 'checkbox', checked: this.settings.ui.external_panel_on_launch,
+        onchange: (e: Event) => { this.settings.ui.external_panel_on_launch = (e.target as HTMLInputElement).checked; this.persistSoon(); } }) as HTMLInputElement;
+      const controls = h('div', { class: 'fh-main-controls' },
+        h('h1', null, 'Flap Happy'),
+        h('p', { class: 'fh-main-copy' }, 'The in-sim panel is available while Flap Happy runs. Open the external panel only when you want a desktop flight display.'),
+        h('div', { class: 'fh-main-actions' }, this.externalBtn,
+          h('button', { class: 'fh-btn fh-main-settings', type: 'button', onclick: () => this.openSettings() }, 'Settings and profiles')),
+        h('label', { class: 'fh-check fh-main-launch' }, this.launchCheck, ' Open the external panel on launch'),
+        h('p', { class: 'fh-hint' }, this.deps.info.panelAvailable ? 'Install the in-sim panel from Settings > Window and app.' : 'Panel feed unavailable. Check that another instance is not using the cockpit port.'));
+      this.displayView = h('div', { class: 'fh-display fh-main-display' }, controls, header);
+      this.paintExternal();
+    } else {
+      this.displayView = h('div', { class: 'fh-display' }, header, this.strip!.el);
+    }
     this.settingsHost = h('div', { class: 'fh-settings-host' });
     root.appendChild(this.displayView);
     root.appendChild(this.settingsHost);
@@ -212,7 +236,10 @@ export class App {
     this.resolver.reset();
     this.smoothIas = null;
     this.lastSample = null;
-    if (this.usingSim) {
+    if (d.info.mainWindow && d.realSource) {
+      d.realSource.start((s) => this.onSample(s));
+      if (this.usingSim) d.sim.start(() => {}); // synthetic control updates only; the session emits samples
+    } else if (this.usingSim) {
       this.syncSimToProfile();
       d.sim.start((s) => this.onSample(s));
     } else if (d.realSource) {
@@ -222,7 +249,6 @@ export class App {
   }
 
   setDemoMode(on: boolean): void {
-    if (this.deps.info.panelOnly) return;
     this.settings.ui.demo_mode = on;
     this.usingSim = on || this.deps.info.source === 'simulated' || !this.deps.realSource;
     this.startSource();
@@ -285,7 +311,7 @@ export class App {
     this.settings.last_profile_id = id;
     this.setUnsaved(null);
     this.setActiveProfile(p, true);
-    if (this.deps.info.panelOnly) await this.persistNow();
+    if (this.deps.info.mainWindow) await this.persistNow();
     else this.persistSoon();
   }
 
@@ -313,7 +339,8 @@ export class App {
     await this.refreshMetas();
     const did = this.setActiveProfile(cloneProfile(d), false);
     this.settings.last_profile_id = d.id;
-    if (this.deps.info.panelOnly) await this.persistNow();
+    if (did && this.deps.info.mainWindow && this.lastTitle) this.settings.active_by_title[this.lastTitle] = d.id;
+    if (this.deps.info.mainWindow) await this.persistNow();
     else this.persistSoon();
     this.setUnsaved(null);
     return did;
@@ -349,7 +376,7 @@ export class App {
   setBallast(f: number, touched: boolean, fromMain = false): void {
     this.ballast = { f: clamp01(f), unconfirmed: touched ? false : this.ballast.unconfirmed, restored: touched ? false : this.ballast.restored };
     if (this.profile) this.settings.ballast_by_profile[this.profile.id] = this.ballast.f;
-    if (this.deps.info.panelOnly) {
+    if (this.deps.info.mainWindow) {
       if (!fromMain && this.profile) void window.flapHappyBridge?.invoke('panel:setBallast', this.profile.id, this.ballast.f).catch(e => console.error('Could not save panel ballast', e));
     } else this.persistSoon();
     this.renderAll();
@@ -400,7 +427,7 @@ export class App {
     this.settingsView = new SettingsView(this);
     clear(this.settingsHost);
     this.settingsHost.appendChild(this.settingsView.el);
-    this.displayView.style.display = 'none';
+    if (!this.deps.info.mainWindow) this.displayView.style.display = 'none';
     this.settingsHost.style.display = 'block';
     void this.settingsView.init();
   }
@@ -424,7 +451,7 @@ export class App {
   // -------------------------------------------------------------- Persisting
 
   persistSoon(): void {
-    if (this.deps.info.panelOnly) { void this.persistNow().catch(e => console.error('Could not save panel settings', e)); return; }
+    if (this.deps.info.mainWindow) { void this.persistNow().catch(e => console.error('Could not save panel settings', e)); return; }
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => void this.persistNow(), SAVE_DEBOUNCE_MS);
   }
@@ -458,38 +485,37 @@ export class App {
   }
 
   renderAll(): void {
-    if (!this.strip) return;
+    if (!this.displayView) return;
     const model = this.buildModelFor(this.profile, this.validation, this.ballast.f);
     this.lastModel = model;
-    this.strip.render(model, { profile: this.profile, zoom: this.settings.ui.zoom });
-    this.slider.render(this.profile, this.ballast);
+    this.strip?.render(model, { profile: this.profile, zoom: this.settings.ui.zoom });
+    this.slider?.render(this.profile, this.ballast);
     setText(this.titleEl, this.profile ? profileLabel(this.profile.id) : 'Flap Happy');
     const bits: string[] = [];
     if (model.statusText) bits.push(model.statusText);
-    if (this.usingSim || (this.deps.info.panelOnly && this.deps.info.source !== 'simconnect')) bits.push('DEMO');
+    else if (this.deps.info.mainWindow && model.link === 'live') bits.push('Connected');
+    if (this.usingSim) bits.push('DEMO');
     if (model.mode === 'noflaps') bits.push('no flaps');
     setText(this.statusEl, bits.join('  |  '));
     toggleClass(this.statusEl, 'warn', model.link !== 'live');
     if (this.pinBtn) toggleClass(this.pinBtn, 'on', this.settings.ui.always_on_top);
     this.paintSaveButton();
     if (this.onModel) this.onModel();
-    this.publishCockpit();
   }
 
-  /** Hand the live display to the in-sim panel. No-op in the browser harness. */
-  private publishCockpit(): void {
-    const bridge = window.flapHappyBridge;
-    if (!bridge || this.deps.info.panelOnly) return;
-    const state: CockpitState = {
-      ready: true,
-      profile: this.profile,
-      sample: this.lastSample,
-      receivedAt: this.lastRx,
-      ballast: this.ballast.f,
-      units: this.settings.units === 'kmh' ? 'kmh' : 'kt',
-      zoom: this.settings.ui.zoom,
-    };
-    void bridge.invoke('panel:state', state);
+  private paintExternal(): void {
+    if (!this.externalBtn) return;
+    this.externalBtn.textContent = this.externalOpen ? 'Close external panel' : 'Show external panel';
+    this.externalBtn.disabled = !this.deps.info.panelAvailable;
+    this.externalBtn.setAttribute('aria-pressed', String(this.externalOpen));
+  }
+
+  private async toggleExternal(): Promise<void> {
+    if (!this.externalBtn || !this.host.setExternalPanel) return;
+    this.externalBtn.disabled = true;
+    try { this.externalOpen = await this.host.setExternalPanel(!this.externalOpen); }
+    catch (e) { console.error('Could not change external panel', e); }
+    finally { this.paintExternal(); }
   }
 
   exportText(p: Profile): string {

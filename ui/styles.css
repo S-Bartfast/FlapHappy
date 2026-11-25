@@ -186,3 +186,14 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-dev-title { width: 180px; }
 .fh-devrow .fh-btn { margin-left: 0; padding: 3px 8px; }
 .fh-devstate { color: #b8a77a; }
+
+/* Visible Electron control window; independent from the shared flight ribbon. */
+.fh-main-controls { border: 1px solid #243040; background: #11161e; padding: 16px; border-radius: 12px; margin-bottom: 12px; }
+.fh-main-controls h1 { font-size: 24px; margin: 0 0 8px; }
+.fh-main-copy { color: #a9b8c9; line-height: 1.4; margin: 0 0 14px; }
+.fh-main-actions { display: flex; flex-wrap: wrap; }
+.fh-main-actions .fh-btn { margin: 0 8px 8px 0; padding: 9px 14px; }
+.fh-external-toggle { background: #175c92; border-color: #3c92d4; }
+.fh-external-toggle:disabled { opacity: 0.45; cursor: default; }
+.fh-main-launch { display: flex; align-items: center; margin: 8px 0; }
+.fh-main-display .fh-header { -webkit-app-region: no-drag; }

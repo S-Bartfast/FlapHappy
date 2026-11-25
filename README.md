@@ -1,6 +1,6 @@
 # Flap Happy
 
-A compact window for MSFS 2024 gliders, and the same display inside the sim, including VR. It shows the current indicated airspeed (IAS) on a segmented bar, where each segment is one flap setting's speed range, plus the current flap position, so you can see at a glance which flap you should be in. A ballast slider shifts the speeds for water ballast. Press **PIN** to keep the desktop window above other programs.
+Flap Happy has a visible main control window for MSFS 2024 gliders and an optional external flight ribbon, with the same ribbon in the sim (including VR). The ribbon shows indicated airspeed (IAS), flap speed ranges and actual flap position. Keep the main app running to use either panel. The current ballast slider adjusts the speed ranges for water ballast.
 
 The app is Electron with `node-simconnect`. It owns the sim connection and serves the cockpit panel. The display is plain HTML/JS/CSS in a conservative subset so the sim's browser can run it.
 
@@ -19,27 +19,29 @@ You need either the portable exe or a folder with these files plus Node.js.
 
 With MSFS 2024: start the sim first or after, either works. Flap Happy reconnects by itself. The desktop window is compact, so the "Waiting for MSFS..." status line is hidden; the bar fills in once the sim is sending data. SimConnect needs no configuration or extra files; it connects over the sim's local connection.
 
-### Panel-only operation
+### Main window and optional external panel
 
-Pass `--panel-only` to the Flap Happy executable (or use `electron . --panel-only` in development).
-The application starts the panel feed and owns the profile library and telemetry in its main
-process, without creating any desktop window or hidden renderer. Invoke the same application
-normally or with `--show` to open its visible desktop window. Closing that window leaves the
-panel session running. Pass `--quit` to the same executable to exit the session. Without
-`--panel-only`, closing the desktop still exits as before.
+Start Flap Happy normally. The main control window always opens with its normal window
+controls and can be minimized or closed to exit. It contains **Settings and profiles**,
+a **Show external panel / Close external panel** button, and a separate **Open the external
+panel on launch** checkbox (off by default). This checkbox is saved across restarts;
+manually opening or closing the ribbon does not change it.
 
-The existing manual ballast control remains available in both views and its value stays
-synchronized in panel-only mode. The startup data source is fixed for the session; use
-`--source=simulated` or a replay trace for testing, not live flight.
+The external ribbon and in-sim panel use the same locally served display. The main process
+owns the telemetry and saved profiles, so closing the external panel or minimizing the main
+window does not stop the feed. External always-on-top, opacity and zoom remain available in
+Settings. Closing the main window exits the app and closes the external panel too.
+A second launch (or `--show`) restores the existing main window; `--quit` exits the session.
+The previous experimental windowless launch flag is no longer a windowless mode.
 
 ### First use
 1. Click the cog (top right) to open the settings.
 2. A new install, or an empty profile folder, gets **AS33-18m**, **AS33-15m**, and **JS3**. AS33-18m opens first. Profiles already in the folder are not copied again.
-3. Close the settings. Drag the ballast slider to match your load.
+3. Close the settings. If needed, open the external panel or use the in-sim panel and set the ballast slider.
 
 Your data lives in `%APPDATA%\FlapHappy\`:
 - `profiles\<name>.json`: one file per profile (readable, shareable; drag a `.json` onto the window to import).
-- `settings.json`: window position, zoom, selected profile, ballast, etc.
+- `settings.json`: window position, zoom, selected profile, ballast, separate main/external window bounds and external-on-launch preference.
 
 Saving writes a `.bak` next to the file first; deleted profiles are kept as `.deleted.bak`.
 
@@ -97,7 +99,7 @@ build/      esbuild build, harness server, Coherent-safe lint
 tests/      unit (core + adapters) and ui (Playwright)
 ```
 
-The desktop UI talks to three adapter interfaces (data, profiles, and host). The cockpit panel is a second view of that same display: the desktop app keeps SimConnect and serves the panel on localhost.
+The desktop UI talks to three adapter interfaces (data, profiles, and host). The main process keeps SimConnect and serves a shared ribbon page on localhost for the in-sim and external windows.
 
 Coherent-safe rules, enforced by `npm run lint:coherent` and by compiling the renderer to ES2015 and checking it with es-check: flexbox and absolute positioning only (no grid, `gap`, CSS variables), no `ResizeObserver`, `localStorage`, `fetch`, clipboard, pointer events, `Object.entries`, `padStart`; mouse and touch events only.
 
@@ -115,7 +117,7 @@ A profile has N flap rows (any N from 0 up; each row: label, a sim index you typ
 
 ## Tests
 - `npm test`: 100 unit tests (profile model, validation, ballast and scale math, flap resolver, display model, file store, simulated source, scenarios incl. a 20-minute soak, replay, CLI parsing).
-- `npm run test:ui`: 31 tests in a real browser (display for N = 0/1/2/6/10, states, fallbacks, ballast slider, editor, import errors, dev panel, compact) and in a real Electron window under simulated and replay sources (real files, restart persistence, compact window with no MINI/FULL button, recording).
+- `npm run test:ui`: 31 tests in a real browser (display for N = 0/1/2/6/10, states, fallbacks, ballast slider, editor, import errors, dev panel, compact) and in a real Electron window under simulated and replay sources (real files, restart persistence, visible control window, external panel lifecycle, launch preference, recording).
 
 ## Only verifiable on Windows with MSFS 2024
 Everything above runs and is tested without the sim. These need a real Windows machine and MSFS:
@@ -125,5 +127,5 @@ Everything above runs and is tested without the sim. These need a real Windows m
 4. Sample rate and behaviour on pause, menus, loading and slew (the "Paused" / "No data" states).
 5. Always-on-top over MSFS in windowed, borderless and true fullscreen modes (the app uses the highest topmost level; exclusive fullscreen may still hide it).
 6. Packaging: the portable exe starts, SmartScreen behaviour, `%APPDATA%\FlapHappy` creation, file open/save dialogs, "Open profiles folder".
-7. Cockpit panel: Settings → Window and app → **Install cockpit panel**, then restart MSFS. In the cockpit (including VR) press Tab and open **Flap Happy**. Flap Happy must be running; its desktop window is optional in panel-only mode.
+7. Cockpit panel: Settings → Window and app → **Install cockpit panel**, then restart MSFS. In the cockpit (including VR) press Tab and open **Flap Happy**. The main application must be running; the external flight ribbon is optional.
 8. The `--record` trace from a real flight replays correctly with `--source=replay`.

@@ -7,7 +7,7 @@ import { selectProfileId } from '../core/select';
 import { validateProfile } from '../core/validate';
 import { PRESETS } from '../profiles';
 
-/** Main-process session for panel-only operation. No renderer or window is required. */
+/** Main-process session for both panels. It does not depend on a renderer. */
 export class PanelRuntime {
   private state: CockpitState = { ready: false, profile: null, sample: null, receivedAt: 0, ballast: 0, units: 'kt', zoom: 1 };
   private title: string | null = null;
@@ -101,6 +101,8 @@ export class PanelRuntime {
       });
     }
   }
+
+  resetSample(): void { this.state = { ...this.state, sample: null, receivedAt: 0 }; }
 
   sample(sample: SimSample, receivedAt: number): void {
     this.state = { ...this.state, sample, receivedAt };

@@ -2,13 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { PanelRuntime } from '../../app-electron/panel-runtime';
 import { parseCli } from '../../app-electron/cli';
 import { MemoryProfileStore } from '../../adapters/simulated/memory-store';
+import { defaultSettings, normalizeSettings } from '../../core/settings';
 import { makeProfile, sample } from './helpers';
 
-describe('panel-only main session', () => {
-  it('recognizes the panel-only and quit commands without changing defaults', () => {
-    expect(parseCli([])).toMatchObject({ panelOnly: false, quit: false });
-    expect(parseCli(['--panel-only', '--source=replay'])).toMatchObject({ panelOnly: true, source: 'replay', quit: false });
-    expect(parseCli(['--quit'])).toMatchObject({ panelOnly: false, quit: true });
+describe('main-process panel session', () => {
+  it('keeps the main window mandatory and defaults the external-on-launch preference off', () => {
+    expect(parseCli([])).toMatchObject({ quit: false });
+    expect(parseCli(['--panel-only', '--source=replay'])).not.toHaveProperty('panelOnly');
+    expect(parseCli(['--quit'])).toMatchObject({ quit: true });
+    expect(defaultSettings().ui.external_panel_on_launch).toBe(false);
+    expect(normalizeSettings({ schema: 'flaphappy.settings/1' }).ui.external_panel_on_launch).toBe(false);
+    expect(normalizeSettings({ schema: 'flaphappy.settings/1', ui: { external_panel_on_launch: true } }).ui.external_panel_on_launch).toBe(true);
   });
 
   it('uses saved profiles and telemetry without a renderer, with preserved manual ballast', async () => {

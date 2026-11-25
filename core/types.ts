@@ -103,6 +103,9 @@ export interface Settings {
     opacity: number;
     zoom: number;
     demo_mode: boolean;
+    external_panel_on_launch: boolean;
   };
+  /** Original ribbon bounds retained for the optional external panel. */
   window: WindowBounds | null;
+  main_window: WindowBounds | null;
 }
