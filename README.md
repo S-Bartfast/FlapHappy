@@ -129,3 +129,5 @@ Everything above runs and is tested without the sim. These need a real Windows m
 6. Packaging: the portable exe starts, SmartScreen behaviour, `%APPDATA%\FlapHappy` creation, file open/save dialogs, "Open profiles folder".
 7. Cockpit panel: Settings → Window and app → **Install cockpit panel**, then restart MSFS. In the cockpit (including VR) press Tab and open **Flap Happy**. The main application must be running; the external flight ribbon is optional.
 8. The `--record` trace from a real flight replays correctly with `--source=replay`.
+
+The visible main window and Settings controls adjust to the available width; narrower windows wrap controls instead of requiring horizontal scrolling.

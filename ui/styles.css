@@ -107,7 +107,7 @@ button, input, select { font-family: inherit; font-size: 14px; }
 
 /* --------------------------------------------------------- Settings editor */
 .fh-settings-host { display: none; }
-.fh-settings { max-width: 1100px; margin: 0 auto; padding-bottom: 40px; }
+.fh-settings { width:100%; min-width:0; margin:0; padding-bottom: 40px; }
 .fh-sethead { display: flex; align-items: center; margin-bottom: 8px; }
 .fh-sethead .fh-back { margin-left: 0; }
 .fh-settitle { font-size: 18px; font-weight: 600; margin-left: 14px; flex: 1; }
@@ -119,8 +119,8 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-prow label { color: #9fb0c3; width: 50px; }
 .fh-toggles { margin: 14px 0 18px 0; }
 .fh-optrow { display: flex; align-items: center; margin: 5px 0; }
-.fh-optrow .fh-unitlab { width: 148px; margin: 0; color: #9fb0c3; }
-.fh-optrow .fh-unitlab.fh-beside { width: auto; margin-left: 28px; margin-right: 8px; }
+.fh-optrow .fh-unitlab { flex:0 0 184px; max-width:100%; width:184px; margin: 0; color: #9fb0c3; }
+.fh-optrow .fh-unitlab.fh-beside { flex:0 0 auto; width:auto; margin-left: 28px; margin-right: 8px; }
 .fh-optrow .fh-unitlab.off, .fh-slide.off { opacity: 0.4; }
 .fh-units { margin-left: 0; display: flex; align-items: center; }
 .fh-slide { position: relative; display: block; width: 44px; height: 24px; margin: 0; }
@@ -230,3 +230,10 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-external-toggle:disabled { opacity: 0.45; cursor: default; }
 .fh-main-launch { display: flex; align-items: center; margin: 8px 0; }
 .fh-main-display .fh-header { -webkit-app-region: no-drag; }
+
+/* Keep the desktop controls within the available window width. */
+.fh-main-display,.fh-main-controls,.fh-settings-host{width:100%;min-width:0;max-width:100%;}
+.fh-settings .fh-prow,.fh-settings .fh-erow,.fh-settings .fh-arow,.fh-settings .fh-optrow{flex-wrap:wrap;}
+.fh-settings .fh-erow > *,.fh-settings .fh-prow > *,.fh-settings .fh-arow > *{max-width:100%;min-width:0;}
+.fh-settings .fh-wide{max-width:100%;min-width:0;}
+@media(max-width:420px){.fh-optrow .fh-unitlab{flex-basis:168px;width:168px;}.fh-settings .fh-arow>label:first-child{width:auto;flex:1 0 100%;}.fh-settings .fh-aglfield+.fh-aglfield{margin-left:0;}}

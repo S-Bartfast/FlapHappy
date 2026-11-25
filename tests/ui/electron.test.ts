@@ -269,3 +269,13 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
     }
   });
 });
+
+it.skipIf(!canRun)('fits main window controls as the actual Windows client width changes',async()=>{
+ const ud=fs.mkdtempSync(path.join(os.tmpdir(),'fh-resizable-main-'));const {app,page}=await launch(ud);
+ try{for(const width of [480,760,1200]){
+   await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setSize(width,560),width);
+   await page.waitForTimeout(150);
+   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+   expect(await page.evaluate(()=>{const e=document.querySelector('.fh-main-controls')!;return e.getBoundingClientRect().width>=document.documentElement.clientWidth-25;})).toBe(true);
+ }}finally{await app.close();}
+});
