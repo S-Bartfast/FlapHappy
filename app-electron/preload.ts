@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 const INVOKE = new Set([
   'store:list', 'store:load', 'store:save', 'store:remove', 'store:getSettings', 'store:setSettings',
   'host:info', 'host:openJson', 'host:saveJson', 'host:setAlwaysOnTop', 'host:setOpacity', 'host:setCompact',
-  'host:openProfilesFolder', 'host:quit', 'host:installPanel', 'source:start', 'source:stop', 'source:setLvar',
+  'host:openProfilesFolder', 'host:quit', 'host:panelStatus', 'host:panelBrowse', 'host:panelSetEnabled', 'host:panelUpdate', 'source:start', 'source:stop', 'source:setLvar',
   'panel:state',
 ]);
 const EVENTS = new Set(['sample', 'source:log', 'panel:ballast']);

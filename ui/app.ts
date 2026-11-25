@@ -106,6 +106,7 @@ export class App {
       }
     }
     this.buildUi();
+    void this.refreshPanelUpdateIndicator();
     this.installDrop();
 
     const id = selectProfileId(this.metas, this.settings, null);
@@ -123,6 +124,17 @@ export class App {
     }
     setInterval(() => this.renderAll(), 500);
     if (!this.profile) this.openSettings();
+  }
+
+  setPanelUpdateIndicator(status: import('../core/panel-install').PanelInstallStatus): void {
+    const pending=status.installed&&status.action==='Update';
+    for(const button of this.deps.root.querySelectorAll<HTMLElement>('.fh-cog,.fh-main-settings')){
+      button.classList.toggle('fh-panel-update',pending);
+      button.title=pending?'Settings — panel update available':'Settings';
+    }
+  }
+  async refreshPanelUpdateIndicator(): Promise<void> {
+    try{const status=await this.host.panelStatus?.(this.settings.panel_destination);if(status)this.setPanelUpdateIndicator(status);}catch{/* no verified update */}
   }
 
   // ---------------------------------------------------------------- UI shell

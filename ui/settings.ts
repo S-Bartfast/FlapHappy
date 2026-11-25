@@ -12,6 +12,7 @@ import { formatSpeedField, heightToMetres, heightUnitLabel, metresToHeight, unit
 import { validateProfile } from '../core/validate';
 import { clear, fmtNum, h, numberOrNull, setText, toggleClass } from './dom';
 import type { App } from './app';
+import type { PanelInstallStatus,PanelInstallResult,PanelDestination } from '../core/panel-install';
 
 export interface ImportDraft {
   name: string;
@@ -524,12 +525,58 @@ export class SettingsView {
     if (caps.opacity) rows.push(h('div', { class: 'fh-arow' }, h('label', null, 'Opacity'), h('input', { type: 'range', min: '0.3', max: '1', step: '0.05', value: String(u.opacity), oninput: (e: Event) => app.setOpacity(Number((e.target as HTMLInputElement).value)) })));
     rows.push(h('div', { class: 'fh-arow' }, h('label', null, 'Zoom'), h('input', { type: 'range', min: '0.5', max: '2', step: '0.1', value: String(u.zoom), oninput: (e: Event) => app.setZoom(Number((e.target as HTMLInputElement).value)) })));
     rows.push(h('div', { class: 'fh-arow' }, h('label', { class: 'fh-check' }, h('input', { type: 'checkbox', class: 'fh-demo', checked: u.demo_mode, onchange: (e: Event) => app.setDemoMode((e.target as HTMLInputElement).checked) }), ' Demo mode: use simulated data instead of the sim')));
-    if (caps.files) {
-      const panelNote = h('div', { class: 'fh-hint' }, 'In VR, press Tab and open Flap Happy. The desktop app has to be running.');
-      rows.push(h('div', { class: 'fh-arow' }, h('button', { class: 'fh-btn', type: 'button', onclick: () => void app.host.installCockpitPanel().then((msg) => setText(panelNote, msg)) }, 'Install cockpit panel'), panelNote));
-    }
+    if (app.host.panelStatus) rows.push(this.panelInstallBox());
     rows.push(h('div', { class: 'fh-hint' }, 'Version ' + app.info.version + ' | data source: ' + (app.usingSim ? 'simulated' : app.info.source)));
     this.appBox.appendChild(h('details', { class: 'fh-details' }, h('summary', null, 'Window and app'), ...rows));
+  }
+
+  private panelInstallBox(): HTMLElement {
+    const app=this.app, host=app.host;
+    let busy=false, status:PanelInstallStatus|null=null, generation=0;
+    const choice=()=>app.settings.panel_destination;
+    const selector=h('select',{'aria-label':'Panel destination'},h('option',{value:'community'},'Default Community'),h('option',{value:'custom'},'Custom folder')) as HTMLSelectElement;
+    const target=h('input',{type:'text',readonly:true,'aria-label':'Custom package parent',class:'fh-panel-path'}) as HTMLInputElement;
+    const browse=h('button',{type:'button',class:'fh-btn'},'Browse') as HTMLButtonElement;
+    const custom=h('div',{class:'fh-arow'},target,browse);
+    const enabled=h('input',{type:'checkbox','aria-label':'Enable in-sim panel'}) as HTMLInputElement;
+    const version=h('div',{class:'fh-hint'});
+    const location=h('div',{class:'fh-hint'});
+    const note=h('div',{class:'fh-hint',role:'status'});
+    const update=h('button',{type:'button',class:'fh-btn'},'Update') as HTMLButtonElement;
+    function paint(message?:string){
+      selector.value=choice().kind;selector.disabled=busy;custom.hidden=choice().kind!=='custom';
+      custom.style.display=custom.hidden?'none':'';
+      target.value=choice().customParent??'';browse.disabled=busy;
+      enabled.checked=status?.installed??false;enabled.disabled=busy||!status||!(status.installed?status.canRemove:status.action==='Install');
+      update.hidden=status?.action!=='Update'||!status.installed;update.disabled=busy;
+      location.hidden=choice().kind!=='community';setText(location,status?.community?'Community: '+status.community:'Community not detected');
+      setText(version,status?.installedVersion?'Installed version: '+status.installedVersion:'Installed version: —');
+      setText(note,message??status?.message??'Checking installation…');
+    }
+    function apply(next:PanelInstallStatus){
+      status=next;
+      if(JSON.stringify(choice())!==JSON.stringify(next.destination)){app.settings.panel_destination=next.destination;app.persistSoon();}
+      app.setPanelUpdateIndicator(next);
+    }
+    async function refresh(next?:PanelDestination){
+      const id=++generation;
+      if(next){app.settings.panel_destination=next;app.persistSoon();}
+      busy=true;status=null;paint();
+      try{const result=await host.panelStatus!(choice());if(id===generation)apply(result);}
+      catch(e){if(id===generation){busy=false;paint(String(e));return;}}
+      if(id===generation){busy=false;paint();}
+    }
+    async function mutate(action:()=>Promise<PanelInstallResult>){
+      if(busy)return;busy=true;paint();
+      try{const result=await action();apply(result.status);busy=false;paint(result.ok?undefined:result.message);}
+      catch(e){busy=false;paint(String(e));}
+    }
+    selector.onchange=()=>void refresh({...choice(),kind:selector.value==='custom'?'custom':'community'});
+    browse.onclick=async()=>{if(busy)return;busy=true;paint();try{const selected=await host.browsePanelParent!();busy=false;if(selected)await refresh({kind:'custom',customParent:selected});else paint();}catch(e){busy=false;paint(String(e));}};
+    enabled.onchange=()=>{const value=enabled.checked;void mutate(()=>host.setPanelInstalled!(choice(),value));};
+    update.onclick=()=>void mutate(()=>host.updatePanel!(choice()));
+    const box=h('div',{class:'fh-panel-install'},h('strong',null,'In-sim panel'),h('div',{class:'fh-arow'},h('label',{class:'fh-check'},enabled,' Enable in-sim panel')),h('div',{class:'fh-arow'},h('label',null,'Install destination'),selector),custom,location,version,h('div',{class:'fh-arow'},update,note));
+    void refresh();return box;
   }
 
   // ------------------------------------------------------------- File actions

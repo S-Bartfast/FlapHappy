@@ -1,3 +1,4 @@
+import type { PanelDestination } from './panel-install';
 export const PROFILE_SCHEMA = 'flaphappy.profile/3';
 export const SETTINGS_SCHEMA = 'flaphappy.settings/1';
 
@@ -116,5 +117,6 @@ export interface Settings {
     /** Cylinder shading on the IAS and AGL fills, including the white end line. */
     bar_shading: boolean;
   };
+  panel_destination:PanelDestination;
   window: WindowBounds | null;
 }
