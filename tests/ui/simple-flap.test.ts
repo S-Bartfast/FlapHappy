@@ -75,6 +75,7 @@ describe('simple flap indicator', () => {
     await page.evaluate(() => { const sim = (window as any).__flapHappy.sim; sim.controls.iasKt = 82; sim.tick(0); });
     await page.waitForTimeout(200);
     await verify(page, 'none', '', '.fh-display');
+    for(const ias of [25,24.5,19,0]){await page.evaluate(v=>{const sim=(window as any).__flapHappy.sim;sim.controls.iasKt=v;sim.tick(0);},ias);await page.waitForTimeout(200);await verify(page,'left','L','.fh-display');}
     await page.setViewportSize({ width: 820, height: 900 });
     await page.click('.fh-cog');
     await page.locator('.fh-simple-flap').evaluate((el: HTMLInputElement) => el.click());
@@ -107,6 +108,8 @@ describe('simple flap indicator', () => {
     iasKt = 70; await page.waitForTimeout(350);
     await verify(page, 'left', 'L–6–5');
     await page.screenshot({ path: `${SHOT_DIR}/simple-flap-panel-narrow.png` });
+    for(const value of [25,24.5,19,0]){iasKt=value;await page.waitForTimeout(350);await verify(page,'left','L');}
+    iasKt=70;await page.waitForTimeout(350);
     failure = true; await page.waitForTimeout(350);
     expect(await page.locator('.fh-simple-row').isVisible()).toBe(false);
     failure = false; await page.waitForTimeout(350);

@@ -175,8 +175,9 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
     // Recommendations use the same received IAS in desktop and cockpit; smoothing is visual only.
     const recommendationIas = sample ? sample.iasKt : null;
     if (mappedRow !== null && sample && sample.onGround !== true &&
-        recommendationIas !== null && isFinite(recommendationIas) && recommendationIas >= GROUND_SPEED_KT) {
-      const row = bucketIndex(recommendationIas, boundaries);
+        recommendationIas !== null && isFinite(recommendationIas) && recommendationIas >= 0) {
+      // A visual IAS lower bound is not a recommendation cutoff.
+        const row = recommendationIas < boundaries[0] ? 0 : bucketIndex(recommendationIas, boundaries);
       if (row >= 0 && row < n && row !== mappedRow) {
         base.simple.suggestion = { label: profile.flaps[row].label, direction: row < mappedRow ? 'slower' : 'faster' };
       }

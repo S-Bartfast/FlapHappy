@@ -27,7 +27,8 @@ describe('display model', () => {
     expect(at(94)).toEqual({ current: 'N', suggestion: { label: '4-3', direction: 'faster' } });
     expect(at(82)).toEqual({ current: 'N', suggestion: null });
     expect(at(88).suggestion).toEqual({ label: '4-3', direction: 'faster' });
-    expect(at(20).suggestion).toBeNull();
+    for(const ias of [25,24.5,19,0])expect(at(ias).suggestion).toEqual({label:'L',direction:'slower'});
+    expect(at(-1).suggestion).toBeNull();
     expect(at(200).suggestion).toBeNull();
   });
 
