@@ -23,5 +23,11 @@ it('keeps actual blue, optionally highlights different suggestion and clears on 
  await d.evaluate(()=>{const s=(window as any).__flapHappy.sim;s.controls.iasKt=70;s.tick(0);});ias=70;
  await d.waitForTimeout(350);await c.waitForTimeout(350);
  expect(await d.locator('.fh-display .fh-cell.recommended').count()).toBe(0);expect(await c.locator('.fh-cell.recommended').count()).toBe(0);
+ for(const value of [25,24.5,19,0]){
+  ias=value;await d.evaluate(v=>{const s=(window as any).__flapHappy.sim;s.controls.iasKt=v;s.tick(0);},value);
+  for(const [page,prefix] of [[d,'.fh-display '],[c,'']] as const)await page.waitForFunction(prefix=>document.querySelector(prefix+'.fh-cell.recommended')?.textContent==='1',prefix);
+ }
+ ground=true;await d.evaluate(()=>{const s=(window as any).__flapHappy.sim;s.controls.onGround=true;s.tick(0);});
+ for(const [page,prefix] of [[d,'.fh-display '],[c,'']] as const)await page.waitForFunction(prefix=>!document.querySelector(prefix+'.fh-cell.recommended'),prefix);
  await d.close();await c.close();
 });

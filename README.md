@@ -116,4 +116,4 @@ Everything above runs and is tested without the sim. These need a real Windows m
 8. The `--record` trace from a real flight replays correctly with `--source=replay`.
 
 ### Recommendation highlight
-Enable **Highlight suggested flap** in Settings to highlight the different flap band suggested by the current IAS in the full ribbon (light amber). The actual handle stays blue. It defaults off, and no highlight is shown on the ground, when the live handle/IAS or valid speeds are unavailable, outside the applicable range, or when the suggestion matches the actual band.
+Enable **Highlight suggested flap** in Settings to highlight the different flap band suggested by the current IAS in the full ribbon (light amber). The actual handle stays blue. It defaults off, and no highlight is shown on the ground, when the live handle/IAS or valid speeds are unavailable, above the applicable IAS range, or when the suggestion matches the actual band. Valid in-flight IAS below the lower edge, including zero, retains the slowest-band highlight independently of the existing 25 kt visual greying threshold.

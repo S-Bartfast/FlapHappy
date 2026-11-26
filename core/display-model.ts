@@ -168,8 +168,9 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
     base.ticks = boundaries.map((b) => formatTick(b, units));
     // Use raw IAS for both hosts; smoothing is purely visual.
     if(live&&validation.structureOk&&flap.status==='row'&&base.currentRow!==null&&sample&&sample.onGround!==true&&
-      sample.iasKt!==null&&isFinite(sample.iasKt)&&sample.iasKt>=GROUND_SPEED_KT){
-      const row=bucketIndex(sample.iasKt,boundaries);
+      sample.iasKt!==null&&isFinite(sample.iasKt)&&sample.iasKt>=0){
+      // A visual IAS lower bound is not a recommendation cutoff.
+        const row=sample.iasKt<boundaries[0]?0:bucketIndex(sample.iasKt,boundaries);
       if(row>=0&&row<base.cells.length&&row!==base.currentRow)base.recommendedRow=row;
     }
     if (hasIas) {
