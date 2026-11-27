@@ -62,19 +62,43 @@ npm run test:ui        # browser + Electron tests (Playwright with a system Chro
 
 Browser harness query options: `?seed=demo|none`, `&dev=0` (hide dev panel), `&compact=1`. Only `demo` loads the three built-in profiles.
 
-Command line flags (after `npm start --` or on the exe):
+### Command-line flags
+
+Use these after `npm start --` or on the Windows executable. Flags with values accept either
+`--name=value` or `--name value`; quote paths containing spaces. Boolean flags use the bare switch
+(or explicitly `=true` / `=false`).
 
 | Flag | Meaning |
 | --- | --- |
-| `--source=simconnect\|simulated\|replay` | data source (default `simconnect`) |
-| `--dev` | show the dev panel (always on for `simulated`) |
-| `--record=file.jsonl` | write every sample to a trace file |
-| `--trace=file.jsonl` `--speed=2` `--loop` | replay a trace (with `--source=replay`) |
-| `--protocol=SunRise\|KittyHawk\|FSX_SP2\|FSX_SP1` | SimConnect protocol (default `SunRise`, MSFS 2024) |
-| `--user-data=<dir>` | use another folder instead of `%APPDATA%\FlapHappy` |
-| `--compact` | accepted for compatibility; the main window always stays framed |
+| `--source=simconnect\|simulated\|replay` | Data source (default `simconnect`). A saved Demo-mode setting takes precedence; `simulated` always selects Demo. |
+| `--dev` | Show the development controls (always on for `--source=simulated`). |
+| `--record=<file.jsonl>` | Append connected telemetry samples to a trace file. |
+| `--trace=<file.jsonl>` | Input trace when using `--source=replay`; required for replay. |
+| `--speed=<number>` | Replay speed multiplier (positive finite number, default 1). |
+| `--loop` | Repeat the replay trace. |
+| `--protocol=SunRise\|KittyHawk\|FSX_SP2\|FSX_SP1` | SimConnect protocol (default `SunRise`, MSFS 2024). |
+| `--user-data=<absolute-folder>` | Use an alternate data folder in place of `%APPDATA%\FlapHappy`. Use the same folder for subsequent launches or exit requests. |
+| `--show` | Conventional second-launch argument: restore/focus the running main window, or start it normally if not running. An ordinary launch does the same. |
+| `--quit` | Ask the running instance to exit; if none is running for that data folder, exit without starting one. |
+| `--compact` | Legacy compatibility switch; does not change the framed main window. |
+| `--smoke` | Developer startup check: print a smoke result and exit with a success/failure code. |
+| `--screenshot=<file.png>` | Developer capture of the main window after startup, then exit. Use an existing writable output directory; may be combined with `--smoke`. |
 
-A sample trace is in `tests/fixtures/sample-trace.jsonl`. `--record` is how you capture a real flight to replay later (useful for bug reports).
+On a second launch, the existing instance is restored; data source, replay, recording and
+developer arguments do not reconfigure that running instance.
+
+Unknown or obsolete flags such as `--panel-only` and `--serve` are ignored; they do not create a
+hidden or server-only mode. Use `npm run harness` for the browser harness.
+Unrecognized source/protocol values use their defaults; invalid replay multipliers use 1.
+Path switches need actual paths; in particular, never pass a bare or empty `--user-data`.
+Replay needs a readable trace, and recording/screenshot output paths must be writable.
+
+Examples:
+- `npm start -- --source=simulated` (no simulator needed).
+- `npm start -- --source=replay --trace=tests/fixtures/sample-trace.jsonl --speed=2 --loop`.
+
+The sample trace is in `tests/fixtures/sample-trace.jsonl`. Use `--record` to capture a trace for later replay
+(useful for bug reports).
 
 ### Build the exe (on Windows)
 
