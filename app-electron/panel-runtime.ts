@@ -7,6 +7,7 @@ import { clamp01 } from '../core/profile';
 import { selectProfileId } from '../core/select';
 import { validateProfile } from '../core/validate';
 import { PRESETS } from '../profiles';
+import { usesManualBallast } from '../core/weight';
 
 /** Main-process session for both panels. It does not depend on a renderer. */
 export class PanelRuntime {
@@ -62,7 +63,7 @@ export class PanelRuntime {
   }
 
   async setBallast(f: number, profileId: string | null = this.state.profile?.id ?? null): Promise<boolean> {
-    if (!profileId || this.state.profile?.id !== profileId || typeof f !== 'number' || !isFinite(f)) return false;
+    if (!profileId || !this.state.ready || this.state.profile?.id !== profileId || !usesManualBallast(this.state.profile) || typeof f !== 'number' || !isFinite(f)) return false;
     const fraction = clamp01(f);
     this.ballastByProfile[profileId] = fraction;
     this.state = { ...this.state, ballast: fraction };
@@ -87,7 +88,7 @@ export class PanelRuntime {
     const ballast = profile ? initialBallast(profile, this.ballastByProfile[profile.id]).f : 0;
     const oldLvar = prior?.current_flap.lvar_name;
     const changed = prior?.id !== profile?.id || this.state.ballast !== ballast;
-    this.state = { ...this.state, ready: true, profile, ballast, units: settings.units, height:settings.height, agl:settings.agl, zoom: settings.ui.zoom,showBallast:settings.ui.show_ballast,showAgl:settings.ui.show_agl,showTransitions:settings.ui.show_transitions,showWind:settings.ui.show_wind,barShading:settings.ui.bar_shading };
+    this.state = { ...this.state, ready: true, profile, ballast, units: settings.units, weightUnit:settings.weight_unit, height:settings.height, agl:settings.agl, zoom: settings.ui.zoom,showBallast:settings.ui.show_ballast,showAgl:settings.ui.show_agl,showTransitions:settings.ui.show_transitions,showWind:settings.ui.show_wind,barShading:settings.ui.bar_shading };
     if (oldLvar !== profile?.current_flap.lvar_name) this.setLvar(profile?.current_flap.lvar_name ?? null);
     if (changed && profile) this.notifyBallast(profile.id, ballast);
     if (profile && settings.last_profile_id !== profile.id) {

@@ -5,6 +5,8 @@ export interface SimSample {
   connected: boolean;
   inFlight: boolean;
   iasKt: number | null;
+  /** Actual loaded aircraft weight in kilograms. Null when unavailable. */
+  totalWeightKg: number | null;
   /** Height above the ground, in feet. `PLANE ALT ABOVE GROUND`. */
   aglFt: number | null;
   /** Ambient wind speed, in knots. `AMBIENT WIND VELOCITY`. */
@@ -25,6 +27,7 @@ export function emptySample(t = 0): SimSample {
     connected: false,
     inFlight: false,
     iasKt: null,
+    totalWeightKg: null,
     aglFt: null,
     windKt: null,
     onGround: null,

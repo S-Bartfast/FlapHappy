@@ -323,9 +323,9 @@ if (!haveLock || cli.quit) {
         root: path.join(__dirname, 'renderer'),
         version: app.getVersion(),
         getState: () => panelRuntime?.getState() ?? null,
-        onBallast: async (f) => {
+        onBallast: async (profileId, f) => {
           if (quitting) return false;
-          return panelRuntime ? panelRuntime.setBallast(f) : false;
+          return panelRuntime ? panelRuntime.setBallast(f, profileId) : false;
         },
       });
       panelAvailable = true;

@@ -17,6 +17,7 @@ describe('main-process panel session', () => {
 
   it('uses saved profiles and telemetry without a renderer, with preserved manual ballast', async () => {
     const p = makeProfile(2, { id: 'fixture' });
+    p.weight_kg={light:null,heavy:null};
     const next = makeProfile(3, { id: 'next' });
     next.current_flap = { source: 'lvar', lvar_name: 'Flap test', manual_fallback: false };
     const store = new MemoryProfileStore([p, next]);
@@ -49,12 +50,14 @@ describe('main-process panel session', () => {
     await runtime.refresh();
     expect(runtime.getState()).toMatchObject({ profile: { id: next.id }, receivedAt: 1300, ballast: next.ballast.default_fraction });
     expect(setLvar).toHaveBeenCalledWith('Flap test');
+    expect(await runtime.setBallast(0.9,next.id)).toBe(false);
+    expect((await runtime.settings()).ballast_by_profile[next.id]).toBeUndefined();
     const changedSettings=await runtime.settings();
-    changedSettings.height='m';changedSettings.agl={bottom_m:10,top_m:500,low_m:100,high_m:300};
+    changedSettings.height='m';changedSettings.weight_unit='lb';changedSettings.agl={bottom_m:10,top_m:500,low_m:100,high_m:300};
     changedSettings.ui.show_agl=false;changedSettings.ui.show_wind=false;changedSettings.ui.show_transitions=true;changedSettings.ui.bar_shading=false;
     await runtime.updateSettings(changedSettings);
     runtime.sample(sample({aircraftTitle:'second',aglFt:600,windKt:17}),1400);
-    expect(runtime.getState()).toMatchObject({height:'m',agl:changedSettings.agl,showAgl:false,showWind:false,showTransitions:true,barShading:false,sample:{aglFt:600,windKt:17}});
+    expect(runtime.getState()).toMatchObject({height:'m',weightUnit:'lb',agl:changedSettings.agl,showAgl:false,showWind:false,showTransitions:true,barShading:false,sample:{aglFt:600,windKt:17}});
     expect((await runtime.settings()).last_profile_id).toBe(next.id);
     expect((await runtime.settings()).ballast_by_profile[p.id]).toBe(0.75);
   });

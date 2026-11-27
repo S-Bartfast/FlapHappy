@@ -2,6 +2,7 @@ import type { Profile, ValidationResult } from './types';
 import type { SimSample } from './sim';
 import type { CurrentFlap } from './flapmap';
 import { columnEdges, effectiveBoundaries, mapMarker, type MarkerRegion } from './scale';
+import { interpolationFraction, liveWeight, type WeightState } from './weight';
 import { aglMarkLabels, aglMarkPositions, defaultAglScale, formatAgl, formatIas, formatTick, type AglScale, type HeightUnit, type SpeedUnit } from './units';
 
 export type LinkState = 'waiting' | 'nodata' | 'paused' | 'live';
@@ -39,6 +40,7 @@ export interface DisplayModel {
   ticks: string[] | null;
   cells: CellModel[];
   iasText: string;
+  weight: WeightState;
   /** Height above ground. The bar runs from Bottom to Top. */
   aglText: string;
   aglPos: number | null;
@@ -63,8 +65,8 @@ export interface ModelInput {
   validation: ValidationResult | null;
   sample: SimSample | null;
   link: LinkState;
-  /** Ballast fraction 0..1. */
-  f: number;
+  /** Stored manual fraction, used only when the loaded-weight anchors are incomplete. */
+  manualBallast?: number;
   /** IAS after display smoothing (falls back to the raw sample when null). */
   ias: number | null;
   /** Height after the same smoothing (falls back to the raw sample when null). */
@@ -86,7 +88,8 @@ const STATUS: Record<LinkState, string | null> = {
 };
 
 export function buildDisplayModel(inp: ModelInput): DisplayModel {
-  const { profile, validation, sample, link, f, flap } = inp;
+  const { profile, validation, sample, link, flap } = inp;
+  const weight = liveWeight(profile, sample, link === 'live');
   const units = inp.units === 'kmh' ? 'kmh' : 'kt';
   const height: HeightUnit = inp.height === 'm' ? 'm' : 'ft';
   const aglScale = inp.agl ?? defaultAglScale();
@@ -101,6 +104,7 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
     ticks: null,
     cells: [],
     iasText: formatIas(null, units),
+    weight,
     aglText: formatAgl(null, height, aglScale).text,
     aglPos: null,
     aglInBand: false,
@@ -136,9 +140,11 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
   }
 
   const n = profile.flaps.length;
-  const boundaries = validation.ok ? effectiveBoundaries(profile, f) : null;
+  const fraction = interpolationFraction(profile, weight, inp.manualBallast);
+  const boundaries = validation.ok && fraction !== null ? effectiveBoundaries(profile, fraction) : null;
   base.mode = n === 0 ? 'noflaps' : validation.ok ? 'ok' : 'incomplete';
   if (base.mode === 'incomplete') base.incompleteMessage = 'profile incomplete: open settings';
+  else if (weight.anchorsValid && weight.kg === null) base.incompleteMessage = 'Flying weight unavailable';
 
   // Flap cells: one per row.
   if (n > 0 && validation.structureOk) {
