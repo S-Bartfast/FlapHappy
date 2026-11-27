@@ -10,7 +10,8 @@ import {
 } from '../core/profile';
 import { formatSpeedField, heightToMetres, heightUnitLabel, metresToHeight, unitLabel, unitToKnots, type SpeedUnit } from '../core/units';
 import { validateProfile } from '../core/validate';
-import { canSaveWeightMode, profileForWeightMode, weightModeForProfile, type WeightMode } from '../core/weight';
+import { deriveLink } from '../core/display-model';
+import { canSaveWeightMode, liveWeight, profileForWeightMode, weightModeForProfile, type WeightMode } from '../core/weight';
 import { clear, fmtNum, h, numberOrNull, setText, toggleClass } from './dom';
 import type { App } from './app';
 
@@ -507,7 +508,9 @@ export class SettingsView {
       const row = d ? d.flaps.find((r) => r.handle_index === liveIdx) : undefined;
       live = `Live: handle index ${liveIdx}` + (s.flapCount !== null ? ` of ${s.flapCount}` : '') + (row ? ` [flap "${row.label}"]` : '');
     }
-    setText(this.liveLine, live);
+    const kg = liveWeight(null, s, deriveLink(s, app.lastRx, Date.now()) === 'live').kg;
+    const weight = kg === null ? 'unavailable' : `${Math.round(kg)} kg`;
+    setText(this.liveLine, `${live} · Aircraft weight: ${weight}`);
     this.rowEls.forEach((r) => toggleClass(r, 'live', liveIdx !== null && r.getAttribute('data-handle') === String(liveIdx)));
   }
 

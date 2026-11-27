@@ -22,7 +22,7 @@ With MSFS 2024: start the sim first or after, either works. Flap Happy reconnect
 ### First use
 1. Click the cog (top right) to open the settings.
 2. A new install, or an empty profile folder, gets **AS33-18m**, **AS33-15m**, and **JS3**. AS33-18m opens first. Profiles already in the folder are not copied again.
-3. Select Manual ballast slider (the default for a new local profile) or Live flying weight. In Manual mode no weight anchors are required. Live mode requires both positive loaded Light and Heavy reference weights (kg), with Light below Heavy, before saving. Existing profiles infer the mode from the anchors; no extra mode field is stored. MSFS supplies actual weight in Live mode. Manual ballast position is saved per profile. A profile with both weights never falls back to manual ballast on missing or stale telemetry.
+3. Select Manual ballast slider (the default for a new local profile) or Live flying weight. In Manual mode no weight anchors are required. Live mode requires both positive loaded Light and Heavy reference weights (kg), with Light below Heavy, before saving. Existing profiles infer the mode from the anchors; no extra mode field is stored. MSFS supplies actual weight in Live mode. The Settings live readout also shows the received total aircraft weight in whole kg, independent of the profile mode, or marks it unavailable if telemetry is missing or stale. Manual ballast position is saved per profile. A profile with both weights never falls back to manual ballast on missing or stale telemetry.
 
 Your data lives in `%APPDATA%\FlapHappy\`:
 - `profiles\<name>.json`: one file per profile (readable, shareable; drag a `.json` onto the window to import).
