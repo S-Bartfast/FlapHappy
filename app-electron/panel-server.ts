@@ -2,6 +2,7 @@ import { createServer, type Server } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import type { CockpitState } from '../core/cockpit';
+import { usesManualBallast } from '../core/weight';
 import { COCKPIT_PORT } from '../core/cockpit';
 
 const types: Record<string, string> = {
@@ -14,13 +15,14 @@ const types: Record<string, string> = {
 
 /**
  * Local page the in-sim panel loads. Bound to 127.0.0.1 only.
- * The desktop app publishes the live profile and sim sample; the panel posts ballast changes back.
+ * The desktop app publishes the live profile and sim sample. Only legacy
+ * profiles permit manual ballast changes from the panel.
  */
 export function startPanelServer(opts: {
   root: string;
   version: string;
   getState: () => CockpitState | null;
-  onBallast: (f: number) => void;
+  onBallast: (profileId: string, f: number) => void;
 }): Promise<Server> {
   const server = createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -41,18 +43,27 @@ export function startPanelServer(opts: {
       return;
     }
     if (req.method === 'POST' && url.pathname === '/api/ballast') {
-      const body = await readBody(req);
-      let f = NaN;
-      try {
-        f = Number(JSON.parse(body).f);
-      } catch {
-        f = NaN;
+      const initial = opts.getState();
+      if (!initial?.ready || !initial.profile || !usesManualBallast(initial.profile)) {
+        req.resume();
+        json(res, 405, { ok: false });
+        return;
       }
-      if (!isFinite(f)) {
+      let body: { profileId?: unknown; f?: unknown } | null = null;
+      try {
+        body = JSON.parse(await readBody(req));
+      } catch { /* malformed or oversized input */ }
+      if (!body || typeof body.profileId !== 'string' || typeof body.f !== 'number' || !isFinite(body.f)) {
         json(res, 400, { ok: false });
         return;
       }
-      opts.onBallast(Math.max(0, Math.min(1, f)));
+      const current = opts.getState();
+      if (!current?.ready || !current.profile || current.profile.id !== body.profileId ||
+          current.profile.id !== initial.profile.id || !usesManualBallast(current.profile)) {
+        json(res, 409, { ok: false });
+        return;
+      }
+      opts.onBallast(body.profileId, Math.max(0, Math.min(1, body.f)));
       json(res, 200, { ok: true });
       return;
     }
@@ -84,13 +95,12 @@ function json(res: import('node:http').ServerResponse, status: number, body: unk
 }
 
 function readBody(req: import('node:http').IncomingMessage): Promise<string> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
-    req.on('data', (c: Buffer) => {
-      size += c.length;
-      if (size < 100000) chunks.push(c);
-    });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('data', (c: Buffer) => { size += c.length; if (size <= 4096) chunks.push(c); });
+    req.on('end', () => size <= 4096 ? resolve(Buffer.concat(chunks).toString('utf8')) : reject(new Error('Body too large')));
+    req.on('error', reject);
+    req.on('aborted', () => reject(new Error('Body aborted')));
   });
 }
