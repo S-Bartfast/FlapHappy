@@ -41,6 +41,9 @@ export interface Profile {
   transitions: Speed[];
   /** Knots. Saved files store this as a single `vne_ms`, with no ballast split. */
   vne: number | null;
+  /** Loaded flying weights for the existing light/heavy speed columns (kg). */
+  weight_kg: { light: number | null; heavy: number | null };
+  /** Manual ballast settings used only when either loaded-weight anchor is missing. */
   ballast: BallastConfig;
   current_flap: CurrentFlapConfig;
   marker_smoothing_ms: number;
@@ -97,6 +100,7 @@ export interface Settings {
   units: 'kt' | 'kmh';
   /** How height above ground is shown. */
   height: 'ft' | 'm';
+  weight_unit: 'kg' | 'lb';
   /** AGL bar ends and the green band, in feet. */
   agl: { bottom_m: number; top_m: number; low_m: number; high_m: number };
   ui: {
