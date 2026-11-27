@@ -8,8 +8,8 @@ describe('optional ribbon recommendation',()=>{
  it('uses raw live IAS, retains slowest band below floor and suppresses ground, invalid, stale and same-band',()=>{
  const p=makeProfile(6);
  const m=(iasKt:number,other:Record<string,unknown>={},link:'live'|'nodata'='live')=>{
- const s=sample({flapCount:6,flapIndex:2,iasKt,...other});
- return buildDisplayModel({profile:p,validation:validateProfile(p),sample:s,link,f:0,ias:70,flap:new CurrentFlapResolver().resolve(p,s,0)});
+ const s=sample({totalWeightKg:400,flapCount:6,flapIndex:2,iasKt,...other});
+ return buildDisplayModel({profile:p,validation:validateProfile(p),sample:s,link,manualBallast:0,ias:70,flap:new CurrentFlapResolver().resolve(p,s,0)});
  };
  expect(m(95).recommendedRow).toBe(4);expect(m(55).recommendedRow).toBe(1);expect(m(70).recommendedRow).toBeNull();
  expect(m(95,{onGround:true}).recommendedRow).toBeNull();expect(m(95,{},'nodata').recommendedRow).toBeNull();

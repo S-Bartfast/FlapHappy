@@ -5,7 +5,7 @@ import {
   uniqueId, transitionName, profileMatchesTitle,
 } from '../../core/profile';
 import { PRESETS } from '../../profiles';
-import { knotsToMs } from '../../core/units';
+import { knotsToMs, kilogramsToWeight, weightToKilograms, formatWeightField } from '../../core/units';
 import { makeProfile } from './helpers';
 import { PROFILE_SCHEMA } from '../../core/types';
 
@@ -14,6 +14,7 @@ const tcount = (n: number) => Math.max(n - 1, 0);
 describe('profile import / export', () => {
   it('ships the three built-in profiles and they normalise cleanly', () => {
     expect(PRESETS.map((p) => p.id)).toEqual(['as33-18m', 'as33-15m', 'js3']);
+    expect(PRESETS.map(p => p.profile.weight_kg)).toEqual([{light:485,heavy:600},{light:475,heavy:550},{light:378,heavy:600}]);
     const as33 = PRESETS[0].profile;
     expect(as33.flaps.map((f) => f.label)).toEqual(['5', 'N', '4', '3', '2', '1']);
     expect(as33.flaps.map((f) => f.handle_index)).toEqual([5, 4, 3, 2, 1, 0]);
@@ -22,6 +23,22 @@ describe('profile import / export', () => {
     for (const preset of PRESETS) {
       expect(preset.profile.transitions).toHaveLength(Math.max(preset.profile.flaps.length - 1, 0));
     }
+  });
+
+  it('uses one loaded-weight pair, drops deprecated unused ballast mass keys, and saves kg to two decimals', () => {
+    const raw = JSON.parse(exportProfileJson(PRESETS[0].profile));
+    raw.ballast.auto.mass_no_ballast_kg = null;
+    raw.ballast.auto.mass_max_ballast_kg = null;
+    raw.weight_kg.light = 485.126;
+    const p = normalizeProfile(raw).profile!;
+    const result = JSON.parse(exportProfileJson(p));
+    expect(result.weight_kg.light).toBe(485.13);
+    expect(result.ballast.auto).not.toHaveProperty('mass_no_ballast_kg');
+    expect(result.ballast.auto).not.toHaveProperty('mass_max_ballast_kg');
+    expect(weightToKilograms(1000,'lb')).toBe(453.59);
+    expect(kilogramsToWeight(453.59237,'lb')).toBeCloseTo(1000);
+    expect(formatWeightField(453.59,'lb')).toBe('1000');
+    expect(formatWeightField(453.59,'kg')).toBe('454');
   });
 
   it('strips _help style keys and round-trips exactly', () => {

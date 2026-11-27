@@ -58,6 +58,13 @@ describe('settings editor: build the AS 33 Me table from scratch', () => {
     expect(await validHead(page)).toContain('Not applied: fix');
     await page.screenshot({ path: `${SHOT_DIR}/flaphappy-editor-incomplete.png`, fullPage: true });
 
+    expect(await page.locator('.fh-weight-mode').inputValue()).toBe('manual');
+    expect(await page.locator(fieldSel('weight_kg.light')).count()).toBe(0);
+    await page.selectOption('.fh-weight-mode', 'live');
+    expect(await page.locator('.fh-settings .fh-save').isDisabled()).toBe(true);
+    await fill(page, 'weight_kg.light', '400');
+    expect(await page.locator('.fh-settings .fh-save').isDisabled()).toBe(true);
+    await fill(page, 'weight_kg.heavy', '600');
     await fill(page, 'vs_min.no_ballast_kt', '48');
     await fill(page, 'vs_min.max_ballast_kt', '56');
     const no = [62, 74, 86, 100, 118];
@@ -156,10 +163,27 @@ describe('settings editor: row rules, validation, undo', () => {
     expect(await page.$$eval('.fh-settings .fh-frow input, .fh-settings .fh-frow select', (e) => e.map((x) => x.getAttribute('data-path')))).toEqual(['flaps[0].label', 'flaps[0].handle_index', 'flaps[1].label', 'flaps[1].handle_index', 'flaps[2].label', 'flaps[2].handle_index']);
     expect(await page.locator('.fh-settings .fh-frow').nth(0).locator('button').evaluateAll((e) => e.map((x) => x.className))).toEqual(['fh-btn fh-remove']);
     expect(await page.$$eval('.fh-settings .fh-frow .fh-handle', (e) => e.map((x) => (x as HTMLInputElement).value))).toEqual(['0', '1', '2']);
-    await sim(page, { flapCount: 4, flapIndex: 1 });
+    await sim(page, { flapCount: 4, flapIndex: 1, totalWeightKg: 537.25 });
     await page.waitForTimeout(300);
-    expect(await page.$eval('.fh-settings .fh-liveline', (e) => e.textContent)).toBe('Live: handle index 1 of 4 [flap "2"]');
+    expect(await page.$eval('.fh-settings .fh-liveline', (e) => e.textContent)).toBe('Live: handle index 1 of 4 [flap "2"] · Aircraft weight: 537 kg');
     expect(await page.$$eval('.fh-settings .fh-frow.live', (e) => e.length)).toBe(1);
+    const readout = page.locator('.fh-settings .fh-liveline');
+    await page.click('[data-weight-unit="lb"]');
+    expect(await readout.textContent()).toContain('1184 lb');
+    await page.click('[data-weight-unit="kg"]');
+    expect(await readout.textContent()).toContain('537 kg');
+    await sim(page, { totalWeightKg: 820.8 });
+    await page.waitForFunction(() => document.querySelector('.fh-liveline')?.textContent?.includes('821 kg'));
+    await sim(page, { totalWeightKg: null });
+    await page.waitForFunction(() => document.querySelector('.fh-liveline')?.textContent?.includes('Aircraft weight: unavailable'));
+    await sim(page, { totalWeightKg: 537.25, flapIndex: null });
+    await page.waitForFunction(() => document.querySelector('.fh-liveline')?.textContent?.includes('537 kg'));
+    await sim(page, { fault: 'stale' });
+    await page.waitForFunction(() => document.querySelector('.fh-liveline')?.textContent?.includes('Aircraft weight: unavailable'));
+    await sim(page, { fault: 'none', flapIndex: 1 });
+    await page.waitForFunction(() => document.querySelector('.fh-liveline')?.textContent?.includes('537 kg'));
+    await sim(page, { connected: false });
+    expect(await readout.textContent()).toContain('Aircraft weight: unavailable');
     await page.close();
   });
 
