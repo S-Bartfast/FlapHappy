@@ -9,6 +9,7 @@ export function defaultSettings(): Settings {
     active_by_title: {},
     ballast_by_profile: {},
     units: 'kt',
+    weight_unit: 'kg',
     height: 'ft',
     agl: defaultAglScale(),
     ui: { compact: true, always_on_top: false, opacity: 1, zoom: 1, demo_mode: false, show_ballast: true, show_agl: true, simple_flap: false, show_transitions: false, show_wind: true, bar_shading: true },
@@ -52,6 +53,7 @@ export function normalizeSettings(raw: unknown): Settings {
     active_by_title: byTitle,
     ballast_by_profile: ballast,
     units,
+    weight_unit: r.weight_unit === 'lb' ? 'lb' : 'kg',
     height,
     agl: {
       bottom_m: aglM(aglIn.bottom_m, aglIn.bottom_ft, d.agl.bottom_m),

@@ -6,8 +6,8 @@ import { clear, h, setText, toggleClass } from './dom';
 import { SimpleFlapView } from './simple-flap';
 
 export interface StripOptions {
-  /** Content area for the ballast slider (shown under the tick row). */
-  ballastRow?: HTMLElement | null;
+  /** Content area for the weight indicator (shown under the tick row). */
+  weightRow?: HTMLElement | null;
   title?: string;
 }
 
@@ -108,7 +108,7 @@ export class StripView {
     this.panel.appendChild(this.flapsRow);
     this.panel.appendChild(this.simple.el);
     this.panel.appendChild(this.tickRow);
-    if (this.opts.ballastRow) this.panel.appendChild(this.opts.ballastRow);
+    if (this.opts.weightRow) this.panel.appendChild(this.opts.weightRow);
     this.panel.appendChild(this.aglRow);
   }
 
@@ -258,7 +258,7 @@ export class StripView {
       this.badge.className = 'fh-badge';
     }
     toggleClass(this.cellsWrap, 'grey', model.mode === 'noflaps');
-    if (this.opts.ballastRow) this.opts.ballastRow.style.display = extra.showBallast === false ? 'none' : '';
+    if (this.opts.weightRow) this.opts.weightRow.style.display = extra.showBallast === false ? 'none' : '';
     this.aglRow.style.display = extra.showAgl === false ? 'none' : '';
     this.tickRow.style.display = !simpleMode && extra.showTransitions === true ? '' : 'none';
     this.rescale(extra.zoom);

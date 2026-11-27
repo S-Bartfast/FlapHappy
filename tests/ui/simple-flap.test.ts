@@ -50,7 +50,7 @@ describe('simple flap indicator', () => {
       a.setShowTransitions(true);
       a.setBallast(0);
       const sim = (window as any).__flapHappy.sim;
-      Object.assign(sim.controls, { flapCount: 6, flapIndex: 3, iasKt: 94, connected: true, onGround: false, inFlight: true });
+      Object.assign(sim.controls, { totalWeightKg:400,flapCount: 6, flapIndex: 3, iasKt: 94, connected: true, onGround: false, inFlight: true });
       sim.tick(0);
     }, p);
     expect(await page.locator('.fh-display .fh-ias-row').isVisible()).toBe(true);

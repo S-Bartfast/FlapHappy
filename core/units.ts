@@ -1,5 +1,10 @@
 /** Display unit. Profile files store metres per second; the app works in knots. */
 export type SpeedUnit = 'kt' | 'kmh';
+export type WeightUnit = 'kg' | 'lb';
+export const KG_PER_LB = 0.45359237;
+export function kilogramsToWeight(kg: number, unit: WeightUnit): number { return unit === 'lb' ? kg / KG_PER_LB : kg; }
+export function weightToKilograms(value: number, unit: WeightUnit): number { return Math.round(value * (unit === 'lb' ? KG_PER_LB : 1) * 100) / 100; }
+export function formatWeightField(kg: number | null, unit: WeightUnit): string { return kg === null ? '' : String(Math.round(kilogramsToWeight(kg, unit))); }
 
 /** International nautical mile: 1 knot = 1.852 km/h = 1852/3600 m/s. */
 export const KT_TO_KMH = 1.852;
