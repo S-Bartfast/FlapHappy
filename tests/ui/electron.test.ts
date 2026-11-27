@@ -191,7 +191,7 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       await page.click('.fh-settings .fh-save');
       await page.waitForFunction(() => document.querySelector('.fh-settings .fh-savestate')?.textContent === 'Saved and applied');
       await page.screenshot({path:`${SHOT_DIR}/flaphappy-main-settings.png`});
-      await page.click('.fh-settings .fh-back');
+      await page.click('.fh-main-settings');
       let panel = await openExternal(app,page);
       await waitUntil(async()=> (await getFeed()).profile?.id==='new-profile','saved profile feed');
       await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle().includes('External panel'))!.setSize(720,360));
@@ -221,6 +221,168 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       if(instance) await instance.app.close().catch(()=>{});
       fs.rmSync(ud,{recursive:true,force:true});
     }
+  });
+
+  it('toggles Settings, keeps one Save, coalesces display drags and flushes on editor and native close',async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-settings-feedback-'));
+    let session=await launch(ud);
+    try{
+      let {app,page}=session;
+      const toggle=page.locator('.fh-main-settings');
+      expect(await toggle.textContent()).toBe('Settings and profiles');
+      await toggle.click();await page.waitForSelector('[data-path="flaps[0].label"]');
+      expect(await toggle.textContent()).toBe('Close settings');
+      expect(await toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(await page.locator('.fh-settings .fh-back').count()).toBe(0);
+      expect(await page.locator('button.fh-save:visible').count()).toBe(1);
+      const label=page.locator('[data-path="flaps[0].label"]');
+      const original=await label.inputValue();
+      await label.fill(original+'x');
+      await toggle.click();
+      expect(await toggle.textContent()).toBe('Settings and profiles');
+      expect(await toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(await page.locator('button.fh-save:visible').count()).toBe(1);
+      expect(await page.locator('button.fh-save:visible').isEnabled()).toBe(true);
+      await toggle.click();await page.waitForSelector('[data-path="flaps[0].label"]');
+      expect(await label.inputValue()).toBe(original+'x');
+      expect(await page.locator('button.fh-save:visible').count()).toBe(1);
+      await toggle.click();
+      await page.locator('button.fh-save:visible').click();
+      const profile=await page.evaluate(()=>(window as any).__flapHappy.profileId());
+      await waitUntil(()=>JSON.parse(fs.readFileSync(path.join(ud,'profiles',profile+'.json'),'utf8')).flaps[0].label===original+'x','header Save retained draft');
+
+      await toggle.click();await page.getByText('Window and app',{exact:true}).click();
+      await page.waitForTimeout(800); // window bounds and previous writes settled
+      const settingsPath=path.join(ud,'settings.json');
+      const originalSettings=fs.readFileSync(settingsPath,'utf8');
+      const range=(name:string)=>page.locator('.fh-arow').filter({hasText:name}).locator('input[type=range]');
+      const drag=async()=>page.evaluate(()=>{
+        const inputs=Array.from(document.querySelectorAll<HTMLInputElement>('.fh-appbox input[type=range]'));
+        if(inputs.length!==2)throw Error('expected opacity and zoom controls');
+        for(let i=0;i<10;i++){
+          inputs[0].value=String(0.5+i*0.05);inputs[0].dispatchEvent(new Event('input',{bubbles:true}));
+          inputs[1].value=String(0.6+i*0.1);inputs[1].dispatchEvent(new Event('input',{bubbles:true}));
+        }
+      });
+      await drag();
+      await waitUntil(async()=> (await getFeed()).zoom===1.5,'immediate panel zoom');
+      expect(fs.readFileSync(settingsPath,'utf8')).toBe(originalSettings);
+      await toggle.click(); // flush pending settings without Save
+      await waitUntil(()=>settingsOnDisk(ud).ui.zoom===1.5,'editor close persists display settings');
+      expect(settingsOnDisk(ud).ui.opacity).toBe(0.95);
+      await toggle.click();await page.getByText('Window and app',{exact:true}).click();
+      await range('Zoom').evaluate((input:HTMLInputElement)=>{input.value='1.8';input.dispatchEvent(new Event('input',{bubbles:true}));});
+      const process=app.process();
+      await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Flap Happy')!.close());
+      await waitUntil(()=>process.exitCode!==null,'native close flush');
+      expect(settingsOnDisk(ud).ui.zoom).toBe(1.8);
+      session=await launch(ud);({app,page}=session);
+      await page.click('.fh-main-settings');await page.getByText('Window and app',{exact:true}).click();
+      expect(await range('Zoom').inputValue()).toBe('1.8');
+    }finally{await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
+  });
+
+  it('keeps one active session across an aircraft switch while a previous profile draft is open',async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-session-switch-'));
+    const first=makeProfile(2,{id:'first-profile'});first.weight_kg={light:null,heavy:null};first.flaps[0].label='First';
+    const second=makeProfile(3,{id:'second-profile'});second.flaps[0].label='Second';
+    fs.mkdirSync(path.join(ud,'profiles'));
+    for(const p of [first,second])fs.writeFileSync(path.join(ud,'profiles',p.id+'.json'),exportProfileJson(p));
+    fs.writeFileSync(path.join(ud,'settings.json'),JSON.stringify({schema:'flaphappy.settings/1',last_profile_id:first.id,active_by_title:{'Simulated glider':first.id,'Other glider':second.id},ballast_by_profile:{[first.id]:0.25}}));
+    const {app,page}=await launch(ud);let browser:import('playwright-core').Browser|undefined;
+    try{
+      const external=await openExternal(app,page);
+      const {chromium}=await import('playwright-core');
+      const executablePath=[process.env.CHROME_PATH,'C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','/usr/bin/chromium','/usr/bin/google-chrome'].find(p=>p&&fs.existsSync(p));
+      browser=await chromium.launch({executablePath,args:['--no-sandbox']});const cockpit=await browser.newPage();await cockpit.goto(panelUrl+'/panel.html');
+      for(const host of [external,cockpit])await host.waitForFunction(()=>document.querySelector('.fh-cell.current')?.textContent==='First');
+      await page.click('.fh-main-settings');await page.waitForSelector('[data-path="flaps[0].label"]');
+      await page.fill('[data-path="flaps[0].label"]','First X');
+      await page.evaluate(()=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,{title:'Other glider',totalWeightKg:500,flapCount:3,flapIndex:0});sim.tick(0);});
+      await waitUntil(async()=> (await getFeed()).profile?.id===second.id,'new profile in panel session');
+      for(const host of [external,cockpit]){
+        await host.waitForFunction(()=>document.querySelector('.fh-cell.current')?.textContent==='Second');
+        await host.waitForFunction(()=>document.querySelector('.fh-sl-pct')?.textContent==='500 kg');
+      }
+      // The main window must agree immediately, not only after the settings editor closes.
+      expect(await page.evaluate(()=>(window as any).__flapHappy.profileId())).toBe(second.id);
+      expect(await page.locator('[data-path="flaps[0].label"]').inputValue()).toBe('First X');
+      expect(await page.locator('.fh-liveline').textContent()).toContain('second-profile');
+      await page.click('[data-weight-unit="lb"]');
+      await waitUntil(async()=> (await getFeed()).weightUnit==='lb','display setting while editing previous aircraft');
+      expect((await getFeed()).profile.id).toBe(second.id);
+      await page.click('.fh-settings .fh-save');
+      await waitUntil(()=>JSON.parse(fs.readFileSync(path.join(ud,'profiles',first.id+'.json'),'utf8')).flaps[0].label==='First X','inactive draft saved');
+      expect((await getFeed()).profile.id).toBe(second.id);
+      expect(await page.evaluate(()=>(window as any).__flapHappy.profileId())).toBe(second.id);
+      expect((await getFeed()).ballast).not.toBe(0.25);
+      await page.click('.fh-main-settings');await page.click('.fh-main-settings');
+      await page.waitForSelector('[data-path="flaps[0].label"]');
+      expect(await page.locator('[data-path="flaps[0].label"]').inputValue()).toBe('Second');
+    }finally{await browser?.close();await app.close();fs.rmSync(ud,{recursive:true,force:true});}
+  });
+
+  it('smooths IAS and AGL markers in both actual panel hosts, retains raw numbers and clears stale history',async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-marker-smoothing-'));
+    const fixture=makeProfile(2,{id:'smoothing-fixture'});
+    fixture.marker_smoothing_ms=300;
+    fs.mkdirSync(path.join(ud,'profiles'));fs.writeFileSync(path.join(ud,'profiles',fixture.id+'.json'),exportProfileJson(fixture));
+    fs.writeFileSync(path.join(ud,'settings.json'),JSON.stringify({schema:'flaphappy.settings/1',last_profile_id:fixture.id,active_by_title:{'Simulated glider':fixture.id}}));
+    const {app,page}=await launch(ud);let browser:import('playwright-core').Browser|undefined;
+    try{
+      const external=await openExternal(app,page);
+      const {chromium}=await import('playwright-core');
+      const executablePath=[process.env.CHROME_PATH,'C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','/usr/bin/chromium','/usr/bin/google-chrome'].find(p=>p&&fs.existsSync(p));
+      browser=await chromium.launch({executablePath,args:['--no-sandbox']});const cockpit=await browser.newPage();await cockpit.goto(panelUrl+'/panel.html');
+      const hosts=[external,cockpit];
+      const send=async(patch:Record<string,unknown>)=>page.evaluate(value=>{
+        const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,value);sim.tick(0);
+      },patch);
+      await send({flapCount:2,totalWeightKg:400,iasKt:45,aglFt:400});
+      for(const host of hosts){
+        await host.waitForFunction(()=>document.querySelector('.fh-readout')?.textContent==='45 kt'&&document.querySelector('.fh-aglread')?.textContent==='400 ft');
+        await host.waitForTimeout(1200);
+        await host.evaluate(()=>{
+          const frames:any[]=[];(window as any).__markerFrames=frames;
+          const capture=()=>{const value=(s:string)=>document.querySelector(s)?.textContent;const pos=(s:string)=>parseFloat((document.querySelector(s) as HTMLElement).style.left);
+            frames.push({ias:value('.fh-readout'),agl:value('.fh-aglread'),marker:pos('.fh-marker'),aglMarker:pos('.fh-aglmarker')});};
+          capture();new MutationObserver(capture).observe(document.getElementById('app')!,{subtree:true,attributes:true,childList:true,characterData:true});
+        });
+      }
+      await send({iasKt:75,aglFt:1000});
+      for(const host of hosts){
+        await host.waitForFunction(()=>document.querySelector('.fh-readout')?.textContent==='75 kt'&&document.querySelector('.fh-aglread')?.textContent==='1000 ft');
+      }
+      await external.waitForTimeout(1800);
+      for(const host of hosts){
+        const frames=await host.evaluate(()=>(window as any).__markerFrames as {ias:string,agl:string,marker:number,aglMarker:number}[]);
+        const first=frames[0],last=frames[frames.length-1];
+        expect(last.marker).toBeGreaterThan(first.marker+40);
+        expect(last.aglMarker).toBeGreaterThan(first.aglMarker+5);
+        expect(frames.some(f=>f.ias==='75 kt'&&f.marker>first.marker+1&&f.marker<last.marker-3)).toBe(true);
+        expect(frames.some(f=>f.agl==='1000 ft'&&f.aglMarker>first.aglMarker+1&&f.aglMarker<last.aglMarker-2)).toBe(true);
+      }
+      await send({fault:'stale'});
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-readout')?.textContent==='--- kt'&&document.querySelector<HTMLElement>('.fh-marker')?.style.display==='none'&&document.querySelector<HTMLElement>('.fh-aglmarker')?.style.display==='none');
+      // First fresh sample after a stale gap should not animate from withheld history.
+      for(const host of hosts)await host.evaluate(()=>{(window as any).__markerFrames.length=0;});
+      await send({fault:'none',iasKt:45,aglFt:400});
+      for(const host of hosts){
+        await host.waitForFunction(()=>document.querySelector('.fh-readout')?.textContent==='45 kt');
+        const first=await host.evaluate(()=>(window as any).__markerFrames.find((f:any)=>f.ias==='45 kt'));
+        expect(first.marker).toBeCloseTo(100*(45-40)/(82-40),0);
+      }
+      // A configured zero tau still disables smoothing.
+      fixture.marker_smoothing_ms=0;
+      await page.evaluate(async p=>{await (window as any).__flapHappy.app.store.save(p);},fixture);
+      for(const host of hosts)await host.evaluate(()=>{(window as any).__markerFrames.length=0;});
+      await send({iasKt:75,aglFt:1000});
+      for(const host of hosts){
+        await host.waitForFunction(()=>document.querySelector('.fh-readout')?.textContent==='75 kt');
+        const first=await host.evaluate(()=>(window as any).__markerFrames.find((f:any)=>f.ias==='75 kt'));
+        expect(first.marker).toBeCloseTo(100*(75-40)/(82-40),0);
+      }
+    }finally{await browser?.close();await app.close();fs.rmSync(ud,{recursive:true,force:true});}
   });
 
   it('uses upstream AGL and wind settings in the shared external and cockpit panel after main-process reconciliation',async()=>{
@@ -300,13 +462,13 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       await page.click('.fh-settings .fh-save');
       await page.waitForFunction(() => document.querySelector('.fh-savestate')?.textContent === 'Saved and applied');
       await page.click('[data-weight-unit="lb"]');
-      await page.click('.fh-settings .fh-back');
+      await page.click('.fh-main-settings');
       for (const view of [external, panel]) {
         await view.waitForFunction(() => document.querySelector('.fh-sl-pct')?.textContent === '1102 lb');
       }
       await page.click('.fh-main-settings');
       await page.click('[data-weight-unit="kg"]');
-      await page.click('.fh-settings .fh-back');
+      await page.click('.fh-main-settings');
       await verify(800, ['50','66','82']);
       expect((await fetch(panelUrl + '/api/ballast', { method: 'POST', body: '{"f":0}' })).status).toBe(405);
       await verify(null, []);
@@ -377,7 +539,7 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       expect((await fetch(panelUrl + '/api/ballast', { method: 'POST', body: JSON.stringify({ profileId: 'wrong-profile', f: 0 }) })).status).toBe(409);
       await page.evaluate(() => { const sim = (window as any).__flapHappy.sim; sim.controls.totalWeightKg = 800; sim.tick(0); });
       for (const view of [external, panel]) await read(view, '50% 100 L', ['45', '59', '82']);
-      await page.click('.fh-main-settings');await page.waitForFunction(()=>document.querySelector('.fh-liveline')?.textContent?.includes('800 kg'));await page.click('.fh-settings .fh-back');
+      await page.click('.fh-main-settings');await page.waitForFunction(()=>document.querySelector('.fh-liveline')?.textContent?.includes('800 kg'));await page.click('.fh-main-settings');
       await page.waitForTimeout(650);
       expect(JSON.parse(fs.readFileSync(path.join(ud, 'settings.json'), 'utf8')).ballast_by_profile[legacy.id]).toBe(0.5);
       await browser.close(); browser = undefined;

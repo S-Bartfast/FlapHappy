@@ -39,6 +39,8 @@ export class SettingsView {
   private saveBtn: HTMLButtonElement;
   private saveState: HTMLElement;
   private dirty = false;
+  private disposed = false;
+  private liveValidationContext = '';
 
   private profileBar: HTMLElement;
   private banner: HTMLElement;
@@ -66,7 +68,7 @@ export class SettingsView {
     this.advanced = h('div', { class: 'fh-advanced' });
     this.appBox = h('div', { class: 'fh-appbox' });
 
-    const back = h('button', { class: 'fh-btn fh-back', type: 'button', onclick: () => this.close() }, app.info.mainWindow ? 'Close settings' : '\u2190 Back to display');
+    const back = app.info.mainWindow ? null : h('button', { class: 'fh-btn fh-back', type: 'button', onclick: () => this.close() }, '\u2190 Back to display');
     this.el = h(
       'div',
       { class: 'fh-settings' },
@@ -85,6 +87,7 @@ export class SettingsView {
 
   async init(): Promise<void> {
     await this.app.refreshMetas();
+    if (this.disposed) return;
     const imp = this.app.consumeImport();
     if (this.app.unsaved) this.draft = cloneProfile(this.app.unsaved);
     else if (this.app.profile) this.draft = cloneProfile(this.app.profile);
@@ -103,6 +106,7 @@ export class SettingsView {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.endDrag();
     if (this.dirty && this.draft) this.app.setUnsaved(this.draft, this.weightMode);
   }
@@ -114,7 +118,8 @@ export class SettingsView {
   // ------------------------------------------------------------------ Drafts
 
   private revalidate(): void {
-    this.validation = this.draft ? validateProfile(this.draft, { liveHandleCount: this.app.liveCount(), requireWeightAnchors: this.weightMode === 'live' }) : null;
+    const activeDraft = !this.app.info.mainWindow || this.draft?.id === this.app.profile?.id;
+    this.validation = this.draft ? validateProfile(this.draft, { liveHandleCount: activeDraft ? this.app.liveCount() : null, requireWeightAnchors: this.weightMode === 'live' }) : null;
   }
 
   /** After any edit: re-validate and refresh field states. The file is written only from Save. */
@@ -503,17 +508,28 @@ export class SettingsView {
     const app = this.app;
     const d = this.draft;
     const s = app.lastSample;
+    const editingOther = app.info.mainWindow && !!d && d.id !== app.profile?.id;
+    if (app.info.mainWindow) {
+      const context = (d?.id ?? '') + ':' + (editingOther ? 'inactive' : app.liveCount());
+      if (context !== this.liveValidationContext) {
+        this.liveValidationContext = context;
+        this.revalidate();
+        this.updateFieldStates();
+        this.renderValidation();
+      }
+    }
     let live = 'Live: no sim data';
     let liveIdx: number | null = null;
     if (s && s.connected && s.flapIndex !== null) {
       liveIdx = Math.round(s.flapIndex);
-      const row = d ? d.flaps.find((r) => r.handle_index === liveIdx) : undefined;
+      const row = !editingOther && d ? d.flaps.find((r) => r.handle_index === liveIdx) : undefined;
       live = `Live: handle index ${liveIdx}` + (s.flapCount !== null ? ` of ${s.flapCount}` : '') + (row ? ` [flap "${row.label}"]` : '');
     }
     const kg = liveWeight(null, s, deriveLink(s, app.lastRx, Date.now()) === 'live').kg;
     const weight = kg === null ? 'unavailable' : `${Math.round(kilogramsToWeight(kg, app.settings.weight_unit))} ${app.settings.weight_unit}`;
     setText(this.liveLine, `${live} · Aircraft weight: ${weight}`);
-    this.rowEls.forEach((r) => toggleClass(r, 'live', liveIdx !== null && r.getAttribute('data-handle') === String(liveIdx)));
+    if (editingOther) this.liveLine.textContent += ' | Active flight profile: ' + (app.profile ? profileLabel(app.profile.id) : 'waiting') + ' (editing a separate draft)';
+    this.rowEls.forEach((r) => toggleClass(r, 'live', !editingOther && liveIdx !== null && r.getAttribute('data-handle') === String(liveIdx)));
   }
 
   // ------------------------------------------------------------ Advanced page

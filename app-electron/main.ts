@@ -223,9 +223,10 @@ function registerIpc(): void {
   ipcMain.handle('store:save', async (_e, p: Profile) => { await store.save(p); await panelRuntime?.refresh(); });
   ipcMain.handle('store:remove', async (_e, id: string) => { await store.remove(id); await panelRuntime?.refresh(); });
   ipcMain.handle('store:getSettings', () => panelRuntime ? panelRuntime.settings() : store.getSettings());
-  ipcMain.handle('store:setSettings', async (_e, s: Settings) => {
+  ipcMain.handle('store:flushSettings', () => panelRuntime?.flush());
+  ipcMain.handle('store:setSettings', async (_e, s: Settings, immediate = true) => {
     if (!panelRuntime || quitting) return;
-    await panelRuntime.updateSettings(s);
+    await panelRuntime.updateSettings(s, immediate !== false);
     const current = await panelRuntime.settings();
     if (quitting) return;
     applyExternalAppearance(current);
@@ -266,6 +267,8 @@ function registerIpc(): void {
   ipcMain.handle('host:openProfilesFolder', () => shell.openPath(store.profilesDir));
   ipcMain.handle('host:quit', () => app.quit());
   ipcMain.handle('host:installPanel', () => installCockpitPanel(path.join(__dirname, 'panel', 'flaphappy-ingamepanel')));
+  ipcMain.handle('panel:getSession', () => panelRuntime?.getSession());
+  ipcMain.handle('panel:selectProfile', (_e, id: string, manual: boolean) => quitting || !panelRuntime ? null : panelRuntime.selectProfile(id, manual));
   ipcMain.handle('panel:setBallast', (_e, profileId: string, f: number) => quitting ? false : panelRuntime?.setBallast(f, profileId));
 
   ipcMain.handle('source:start', () => {
@@ -316,7 +319,7 @@ if (!haveLock || cli.quit) {
     store = new FileProfileStore(app.getPath('userData'));
     await store.getSettings();
     registerIpc();
-    panelRuntime = new PanelRuntime(store, (name) => source?.setLvarName?.(name), (profileId, f) => send('panel:ballast', { profileId, f }));
+    panelRuntime = new PanelRuntime(store, (name) => source?.setLvarName?.(name), (session) => send('panel:session', session));
     await panelRuntime.initialize();
     try {
       await startPanelServer({
@@ -346,7 +349,7 @@ if (!haveLock || cli.quit) {
       event.preventDefault();
       quitting = true;
       stopSource();
-      void panelRuntime.flush().finally(() => app.quit());
+      void panelRuntime.flush().catch(e => console.error('Could not flush settings on exit', e)).finally(() => app.quit());
       return;
     }
     quitting = true;

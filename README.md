@@ -35,7 +35,11 @@ A second launch (or `--show`) restores the existing main window; `--quit` exits 
 The previous experimental windowless launch flag is no longer a windowless mode.
 
 ### First use
-1. Click Settings and profiles in the main window.
+1. Click **Settings and profiles** in the main window. The same button becomes **Close settings**.
+   Only one **Save** button is shown; closing the editor retains an unsaved profile draft for later saving.
+   Display preferences apply immediately and are saved after a short pause or on close; they do not require profile Save.
+   The active flight profile follows the main session even while editing; an earlier aircraft's retained draft can
+   be saved without assigning it to the newly detected aircraft.
 2. A new install, or an empty profile folder, gets **AS33-18m**, **AS33-15m**, and **JS3**. AS33-18m opens first. Profiles already in the folder are not copied again.
 3. Select Manual ballast slider (the default for a new local profile) or Live flying weight. In Manual mode no weight anchors are required. Live mode requires both positive loaded Light and Heavy reference weights (kg), with Light below Heavy, before saving. Use the Weight unit toggle for whole kg or lb in the editor and both displays; profile files retain kg to two decimals. The bundled examples include provisional loaded-weight anchors from the WSG 18 m AS33, 15 m AS33 and 18 m JS3 reference profiles, retaining the original illustrative speed tables. Existing profiles infer the mode from the anchors; no extra mode field is stored. MSFS supplies actual weight in Live mode. The Settings live readout also shows the received total aircraft weight in whole kg or lb, independent of the profile mode, or marks it unavailable if telemetry is missing or stale. Manual ballast position is saved per profile. A profile with both weights never falls back to manual ballast on missing or stale telemetry.
 

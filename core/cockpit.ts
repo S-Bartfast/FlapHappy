@@ -1,6 +1,14 @@
 import type { Profile } from './types';
 import type { SimSample } from './sim';
 
+/** Authoritative active profile/ballast snapshot, separate from any editor draft. */
+export interface ActiveSession {
+  revision: number;
+  ready: boolean;
+  profile: Profile | null;
+  ballast: number;
+}
+
 /** Live display state published by the main process for the shared in-sim and external display. */
 export interface CockpitState {
   ready: boolean;

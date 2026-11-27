@@ -1,4 +1,5 @@
 import type { DataSource, Host, HostInfo, ProfileStore, SimSample } from '../core/sim';
+import type { ActiveSession } from '../core/cockpit';
 import type { Profile, ProfileMeta, Settings, ValidationResult } from '../core/types';
 import { validateProfile } from '../core/validate';
 import { CurrentFlapResolver, type CurrentFlap } from '../core/flapmap';
@@ -51,6 +52,7 @@ export class App {
   private strip?: StripView;
   private slider?: WeightControl;
   private externalBtn: HTMLButtonElement | null = null;
+  private settingsBtn: HTMLButtonElement | null = null;
   private launchCheck: HTMLInputElement | null = null;
   private externalOpen = false;
   private displayView!: HTMLElement;
@@ -67,6 +69,8 @@ export class App {
   unsavedWeightMode: WeightMode = 'manual';
   private lastTitle: string | null = null;
   private manualPick = false;
+  private sessionRevision = -1;
+  private sessionReady = false;
   private pendingImport: ImportDraft | null = null;
 
   constructor(private deps: AppDeps) {}
@@ -90,7 +94,7 @@ export class App {
   async init(): Promise<void> {
     this.settings = await this.deps.store.getSettings();
     this.metas = await this.deps.store.list();
-    if (this.deps.info.platform !== 'browser') {
+    if (!this.deps.info.mainWindow && this.deps.info.platform !== 'browser') {
       // New install: write each built-in once. An id that is already there is left alone.
       let added = false;
       for (let i = 0; i < PRESETS.length; i++) {
@@ -113,33 +117,27 @@ export class App {
     this.buildUi();
     this.installDrop();
 
-    const id = selectProfileId(this.metas, this.settings, null);
-    if (id) await this.activate(id, false);
-    else this.renderAll();
+    const mainBridge = this.deps.info.mainWindow ? window.flapHappyBridge : undefined;
+    if (mainBridge) {
+      mainBridge.on('panel:session', value => this.receiveSession(value as ActiveSession));
+      this.receiveSession(await mainBridge.invoke('panel:getSession') as ActiveSession);
+    } else {
+      const id = selectProfileId(this.metas, this.settings, null);
+      if (id) await this.activate(id, false);
+      else this.renderAll();
+    }
 
     this.usingSim = this.deps.info.source === 'simulated' || this.settings.ui.demo_mode || !this.deps.realSource;
     this.startSource();
     this.applyHostSettings();
     const bridge = window.flapHappyBridge;
-    if (bridge) {
-      bridge.on('panel:ballast', (f) => {
-        if (typeof f === 'number' && isFinite(f)) this.setManualBallast(f, true, true);
-        else if (this.deps.info.mainWindow && f && typeof f === 'object') {
-          const update = f as { profileId?: string; f?: number };
-          if (typeof update.profileId === 'string' && typeof update.f === 'number' && isFinite(update.f)) {
-            this.settings.ballast_by_profile[update.profileId] = update.f;
-            if (this.profile?.id === update.profileId) this.setManualBallast(update.f, true, true);
-          }
-        }
-      });
-    }
     if (this.deps.info.mainWindow && bridge) {
       bridge.on('host:externalPanel', value => { this.externalOpen = value === true; this.paintExternal(); });
       this.externalOpen = await this.host.getExternalPanel?.() ?? false;
       this.paintExternal();
     }
     setInterval(() => this.renderAll(), 500);
-    if (!this.profile) this.openSettings();
+    if (!this.profile && (!this.deps.info.mainWindow || this.sessionReady)) this.openSettings();
   }
 
   // ---------------------------------------------------------------- UI shell
@@ -175,11 +173,12 @@ export class App {
       this.externalBtn = h('button', { class: 'fh-btn fh-external-toggle', type: 'button', onclick: () => void this.toggleExternal() }, 'Show external panel') as HTMLButtonElement;
       this.launchCheck = h('input', { class: 'fh-external-launch', type: 'checkbox', checked: this.settings.ui.external_panel_on_launch,
         onchange: (e: Event) => { this.settings.ui.external_panel_on_launch = (e.target as HTMLInputElement).checked; this.persistSoon(); } }) as HTMLInputElement;
+      this.settingsBtn = h('button', { class: 'fh-btn fh-main-settings', type: 'button', 'aria-expanded': 'false', onclick: () => this.settingsOpen ? this.closeSettings() : this.openSettings() }, 'Settings and profiles') as HTMLButtonElement;
       const controls = h('div', { class: 'fh-main-controls' },
         h('h1', null, 'Flap Happy'),
         h('p', { class: 'fh-main-copy' }, 'The in-sim panel is available while Flap Happy runs. Open the external panel only when you want a desktop flight display.'),
         h('div', { class: 'fh-main-actions' }, this.externalBtn,
-          h('button', { class: 'fh-btn fh-main-settings', type: 'button', onclick: () => this.openSettings() }, 'Settings and profiles')),
+          this.settingsBtn),
         h('label', { class: 'fh-check fh-main-launch' }, this.launchCheck, ' Open the external panel on launch'),
         h('p', { class: 'fh-hint' }, this.deps.info.panelAvailable ? 'Install the in-sim panel from Settings > Window and app.' : 'Panel feed unavailable. Check that another instance is not using the cockpit port.'));
       this.displayView = h('div', { class: 'fh-display fh-main-display' }, controls, header);
@@ -271,11 +270,15 @@ export class App {
 
   private onSample(s: SimSample): void {
     const now = Date.now();
+    const oldCount = this.liveCount();
     this.lastSample = s;
+    if (this.deps.info.mainWindow && this.profile && oldCount !== this.liveCount()) {
+      this.validation = validateProfile(this.profile, {liveHandleCount: this.liveCount()});
+    }
     this.lastRx = this.deps.info.source === 'replay' && !this.usingSim ? now : s.t;
     if (s.connected && s.aircraftTitle && s.aircraftTitle !== this.lastTitle) {
       this.lastTitle = s.aircraftTitle;
-      void this.autoSelectForTitle(s.aircraftTitle);
+      if (!this.deps.info.mainWindow) void this.autoSelectForTitle(s.aircraftTitle);
     }
     if (s.connected && this.profile) {
       const dt = this.smoothAt ? now - this.smoothAt : 0;
@@ -302,12 +305,40 @@ export class App {
 
   // ---------------------------------------------------------------- Profiles
 
+  private receiveSession(session: ActiveSession | null): void {
+    if (!session || session.revision < this.sessionRevision) return;
+    this.sessionRevision = session.revision;
+    this.sessionReady = session.ready;
+    const changed = this.profile?.id !== session.profile?.id;
+    this.profile = session.profile;
+    this.validation = this.profile ? validateProfile(this.profile, { liveHandleCount: this.liveCount() }) : null;
+    // Never dispose or replace a user's draft when the active aircraft changes.
+    if (changed) {
+      this.resolver.reset();
+      this.smoothIas = this.smoothAgl = null;
+      this.smoothAt = 0;
+      this.syncSimToProfile();
+    }
+    if (this.profile) {
+      this.settings.last_profile_id = this.profile.id;
+      if (usesManualBallast(this.profile)) this.settings.ballast_by_profile[this.profile.id] = session.ballast;
+    }
+    this.ballast = { f: session.ballast, unconfirmed: false, restored: false };
+    this.renderAll();
+  }
+
   async refreshMetas(): Promise<void> {
     this.metas = await this.deps.store.list();
   }
 
   /** Make a stored profile the active one. `manual` remembers the choice for the current aircraft title. */
   async activate(id: string, manual: boolean): Promise<void> {
+    if (this.deps.info.mainWindow && window.flapHappyBridge) {
+      const session = await window.flapHappyBridge.invoke('panel:selectProfile', id, manual) as ActiveSession;
+      this.receiveSession(session);
+      if (session?.profile?.id === id) this.setUnsaved(null);
+      return;
+    }
     let p: Profile;
     try {
       p = await this.deps.store.load(id);
@@ -349,9 +380,16 @@ export class App {
     const d = profileForWeightMode(draft, weightMode);
     await this.deps.store.save(d);
     await this.refreshMetas();
+    if (this.deps.info.mainWindow && window.flapHappyBridge) {
+      // Saving an old aircraft's draft writes that file, not a new assignment
+      // for whichever aircraft is live now. The session reloads its own profile.
+      this.receiveSession(await window.flapHappyBridge.invoke('panel:getSession') as ActiveSession);
+      const did = this.profile?.id === d.id && validateProfile(d, {liveHandleCount: this.liveCount()}).ok;
+      this.setUnsaved(null);
+      return did;
+    }
     const did = this.setActiveProfile(cloneProfile(d), false);
     this.settings.last_profile_id = d.id;
-    if (did && this.deps.info.mainWindow && this.lastTitle) this.settings.active_by_title[this.lastTitle] = d.id;
     if (this.deps.info.mainWindow) await this.persistNow();
     else this.persistSoon();
     this.setUnsaved(null);
@@ -397,13 +435,15 @@ export class App {
     this.renderAll();
   }
 
-  setManualBallast(f: number, touched: boolean, fromMain = false): void {
+  setManualBallast(f: number, touched: boolean): void {
     if (!usesManualBallast(this.profile) || !this.profile || !isFinite(f)) return;
+    if (this.deps.info.mainWindow && window.flapHappyBridge) {
+      void window.flapHappyBridge.invoke('panel:setBallast', this.profile.id, clamp01(f)).catch(e => console.error('Could not save panel ballast', e));
+      return;
+    }
     this.ballast = { f: clamp01(f), unconfirmed: touched ? false : this.ballast.unconfirmed, restored: touched ? false : this.ballast.restored };
     this.settings.ballast_by_profile[this.profile.id] = this.ballast.f;
-    if (this.deps.info.mainWindow) {
-      if (!fromMain) void window.flapHappyBridge?.invoke('panel:setBallast', this.profile.id, this.ballast.f).catch(e => console.error('Could not save panel ballast', e));
-    } else this.persistSoon();
+    this.persistSoon();
     this.renderAll();
   }
 
@@ -503,6 +543,7 @@ export class App {
     this.settingsHost.appendChild(this.settingsView.el);
     if (!this.deps.info.mainWindow) this.displayView.style.display = 'none';
     this.settingsHost.style.display = 'block';
+    this.paintSettingsButton();
     void this.settingsView.init();
   }
 
@@ -514,8 +555,18 @@ export class App {
     clear(this.settingsHost);
     this.settingsHost.style.display = 'none';
     this.displayView.style.display = 'block';
-    void this.refreshMetas();
+    this.paintSettingsButton();
+    if (this.deps.info.mainWindow) void window.flapHappyBridge?.invoke('store:flushSettings').catch(e => console.error('Could not save panel settings', e));
+    else if (this.saveTimer) void this.persistNow().catch(e => console.error('Could not save settings', e));
     this.renderAll();
+  }
+
+  private paintSettingsButton(): void {
+    if (!this.settingsBtn) return;
+    setText(this.settingsBtn, this.settingsOpen ? 'Close settings' : 'Settings and profiles');
+    this.settingsBtn.setAttribute('aria-expanded', String(this.settingsOpen));
+    // The editor owns Save while open. The header still offers Save for a closed, retained draft.
+    if (this.saveBtn) this.saveBtn.style.display = this.settingsOpen ? 'none' : '';
   }
 
   get settingsOpen(): boolean {
@@ -525,7 +576,12 @@ export class App {
   // -------------------------------------------------------------- Persisting
 
   persistSoon(): void {
-    if (this.deps.info.mainWindow) { void this.persistNow().catch(e => console.error('Could not save panel settings', e)); return; }
+    if (this.deps.info.mainWindow && window.flapHappyBridge) {
+      // Publish display preferences now; only the main session debounces disk writes.
+      // It can flush even when the renderer closes before the delay expires.
+      void window.flapHappyBridge.invoke('store:setSettings', this.settings, false).catch(e => console.error('Could not save panel settings', e));
+      return;
+    }
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => void this.persistNow(), SAVE_DEBOUNCE_MS);
   }
