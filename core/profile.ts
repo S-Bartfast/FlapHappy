@@ -52,6 +52,7 @@ export function createBlankProfile(id = 'new-profile'): Profile {
     vs_min: blankSpeed(),
     transitions: [],
     vne: null,
+    weight_kg: { light: null, heavy: null },
     ballast: defaultBallast(),
     current_flap: defaultCurrentFlap(),
     marker_smoothing_ms: 300,
@@ -145,10 +146,13 @@ export function normalizeProfile(input: unknown): ParseResult {
   if (errors.length) return { profile: null, errors };
 
   const base = createBlankProfile();
+  const weights = isObj(r.weight_kg) ? r.weight_kg : {};
   const ballastIn = isObj(r.ballast) ? r.ballast : {};
   const cfIn = isObj(r.current_flap) ? r.current_flap : {};
   const matchIn = isObj(r.match) ? r.match : {};
   const autoIn = isObj(ballastIn.auto) ? stripUnderscore(ballastIn.auto) : {};
+  delete autoIn.mass_no_ballast_kg;
+  delete autoIn.mass_max_ballast_kg;
   const src = cfIn.source;
 
   const profile: Profile = {
@@ -165,6 +169,7 @@ export function normalizeProfile(input: unknown): ParseResult {
     vs_min: normSpeed(r.vs_min),
     transitions: transIn.map((row) => ({ ...normSpeed(row), ...(isObj(row) && row.exclude_from_display === true ? { exclude_from_display:true } : {}) })),
     vne: normVne(r),
+    weight_kg: { light: numOrNull(weights.light), heavy: numOrNull(weights.heavy) },
     ballast: {
       ...base.ballast,
       default_fraction: clamp01(numOr(ballastIn.default_fraction, base.ballast.default_fraction)),
@@ -225,6 +230,7 @@ export function exportProfileJson(p: Profile): string {
     vs_min: speedToFile(p.vs_min),
     transitions: p.transitions.map(t => ({ ...speedToFile(t), ...(t.exclude_from_display === true ? { exclude_from_display:true } : {}) })),
     vne_ms: p.vne === null ? null : knotsToMs(p.vne),
+    weight_kg: { light: p.weight_kg.light === null ? null : Math.round(p.weight_kg.light * 100) / 100, heavy: p.weight_kg.heavy === null ? null : Math.round(p.weight_kg.heavy * 100) / 100 },
     ballast: p.ballast,
     current_flap: p.current_flap,
     marker_smoothing_ms: p.marker_smoothing_ms,

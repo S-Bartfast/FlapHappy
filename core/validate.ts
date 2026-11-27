@@ -3,6 +3,8 @@ import type { FlapPosition, Issue, IssueCategory, Profile, ValidationResult } fr
 export interface ValidateOptions {
   /** Live `FLAPS NUM HANDLE POSITIONS` when the sim is connected. */
   liveHandleCount?: number | null;
+  /** The editor explicitly selected live weight; both anchors are then required. */
+  requireWeightAnchors?: boolean;
 }
 
 export const MIN_BUCKET_ERROR_KT = 2;
@@ -100,6 +102,18 @@ export function validateProfile(p: Profile, opts: ValidateOptions = {}): Validat
         add('warning', 'structure', 'index-range', `Handle index ${row.handle_index} is outside 0..${count - 1} (${where} ${count} positions)`, path + '.handle_index');
       }
     }
+  }
+
+  // Missing either endpoint is a supported manual-ballast profile. Supplied
+  // values must be valid; a complete pair must be ordered.
+  const weights = p.weight_kg;
+  if (opts.requireWeightAnchors) {
+    if (weights?.light == null) add('error', 'other', 'weight-light-required', 'Enter Light flying weight for live weight mode', 'weight_kg.light');
+    if (weights?.heavy == null) add('error', 'other', 'weight-heavy-required', 'Enter Heavy flying weight for live weight mode', 'weight_kg.heavy');
+  }
+  if (weights) {
+    if (weights.light !== null && (!isNum(weights.light) || weights.light <= 0)) add('error', 'other', 'weight-light', 'Light flying weight must be positive', 'weight_kg.light');
+    if (weights.heavy !== null && (!isNum(weights.heavy) || weights.heavy <= 0 || (isNum(weights.light) && weights.heavy <= weights.light))) add('error', 'other', 'weight-heavy', 'Heavy flying weight must exceed Light', 'weight_kg.heavy');
   }
 
   // --- Required numbers ---

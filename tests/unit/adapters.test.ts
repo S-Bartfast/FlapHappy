@@ -239,7 +239,7 @@ describe('scenarios', () => {
       const s = last as SimSample | null;
       if (!s) continue;
       const flap = resolver.resolve(profile, s, now);
-      const model = buildDisplayModel({ profile, validation: valid, sample: s, link: s.connected ? 'live' : 'waiting', f: ballast, ias: s.iasKt, flap });
+      const model = buildDisplayModel({ profile, validation: valid, sample: { ...s, totalWeightKg: 400 + ballast * 200 }, link: s.connected ? 'live' : 'waiting', ias: s.iasKt, flap });
       seen++;
       expect(model.cells.filter((c) => c.state === 'current').length).toBeLessThanOrEqual(1);
       if (model.marker.pos !== null) expect(model.marker.pos).toBeGreaterThanOrEqual(0);

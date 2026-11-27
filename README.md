@@ -1,6 +1,6 @@
 # Flap Happy
 
-A compact window for MSFS 2024 gliders, and the same display inside the sim, including VR. It shows the current indicated airspeed (IAS) on a segmented bar, where each segment is one flap setting's speed range, plus the current flap position, so you can see at a glance which flap you should be in. A ballast slider shifts the speeds for water ballast. Press **PIN** to keep the desktop window above other programs.
+A compact window for MSFS 2024 gliders, and the same display inside the sim, including VR. It shows the current indicated airspeed (IAS) on a segmented bar, where each segment is one flap setting's speed range, plus the current flap position, so you can see at a glance which flap you should be in. For profiles with both loaded reference weights, live total flying weight shifts the speeds automatically and the weight indicator is read-only. Profiles without both weights retain the original manual ballast slider. Press **PIN** to keep the desktop window above other programs.
 
 The desktop app is Electron with `node-simconnect`. It owns the sim connection and serves the cockpit panel. The display is plain HTML/JS/CSS in a conservative subset so the sim's browser can run it.
 
@@ -22,11 +22,11 @@ With MSFS 2024: start the sim first or after, either works. Flap Happy reconnect
 ### First use
 1. Click the cog (top right) to open the settings.
 2. A new install, or an empty profile folder, gets **AS33-18m**, **AS33-15m**, and **JS3**. AS33-18m opens first. Profiles already in the folder are not copied again.
-3. Close the settings. Drag the ballast slider to match your load.
+3. Select Manual ballast slider (the default for a new local profile) or Live flying weight. In Manual mode no weight anchors are required. Live mode requires both positive loaded Light and Heavy reference weights (kg), with Light below Heavy, before saving. Use the Weight unit toggle for whole kg or lb in the editor and both displays; profile files retain kg to two decimals. The bundled examples include provisional loaded-weight anchors from the WSG 18 m AS33, 15 m AS33 and 18 m JS3 reference profiles, retaining the original illustrative speed tables. Existing profiles infer the mode from the anchors; no extra mode field is stored. MSFS supplies actual weight in Live mode. The Settings live readout also shows the received total aircraft weight in whole kg or lb, independent of the profile mode, or marks it unavailable if telemetry is missing or stale. Manual ballast position is saved per profile. A profile with both weights never falls back to manual ballast on missing or stale telemetry.
 
 Your data lives in `%APPDATA%\FlapHappy\`:
 - `profiles\<name>.json`: one file per profile (readable, shareable; drag a `.json` onto the window to import).
-- `settings.json`: window position, zoom, selected profile, ballast, etc.
+- `settings.json`: window position, zoom, selected profile, etc. Manual ballast preferences are retained per profile and used only when either weight anchor is absent.
 
 Saving writes a `.bak` next to the file first; deleted profiles are kept as `.deleted.bak`.
 
@@ -74,7 +74,7 @@ The exe is unsigned. Its icon is the same glider as the VR toolbar. The config w
 ```
 core/       pure TypeScript, no DOM/Node: profile model, validation, ballast math, scale/marker math,
             current-flap resolver (index -> percent -> L: var -> "FLAP ?"), display-model builder
-ui/         plain DOM view code (strip, ballast slider, settings editor, app orchestrator)
+ui/         plain DOM view code (strip, weight indicator / manual ballast slider, settings editor, app orchestrator)
 adapters/   DataSource / ProfileStore / Host implementations:
               simulated/  SimulatedSource, ScenarioPlayer, ReplaySource, MemoryProfileStore, dev panel
               electron/   SimConnectSource (main process), FileProfileStore, bridge adapters (IPC)
@@ -89,10 +89,10 @@ The desktop UI talks to three adapter interfaces (data, profiles, and host). The
 Coherent-safe rules, enforced by `npm run lint:coherent` and by compiling the renderer to ES2015 and checking it with es-check: flexbox and absolute positioning only (no grid, `gap`, CSS variables), no `ResizeObserver`, `localStorage`, `fetch`, clipboard, pointer events, `Object.entries`, `padStart`; mouse and touch events only.
 
 ### Profiles in brief
-A profile has N flap rows (any N from 0 up; each row: label and a sim index you type in) and exactly N-1 transitions, plus Vs and Vne. Saved speeds are metres per second to two decimal places; the display converts them to whole kt or km/h. The ballast slider interpolates stall and transition speeds between the two ends. VNE is one speed, saved as `vne_ms`. Validation (inline, with a summary box) requires strictly ascending speeds at both ballast ends; buckets narrower than 4 kt warn, narrower than 2 kt are errors. The display shows an error/incomplete message instead of misleading data when a profile is not valid.
+A profile has N flap rows (any N from 0 up; each row: label, a sim index you type in) and exactly N-1 transitions, plus Vs and Vne. Saved speeds are metres per second to two decimal places; the display converts them to whole kt or km/h. With both anchors supplied, the read-only weight indicator interpolates stall and transition speeds between the explicit Light and Heavy loaded weights. Weights outside this interval clamp only the interpolation; absent or stale telemetry leaves the ribbon unavailable in this mode. If either anchor is blank, the manual ballast slider instead uses the original No/Max Ballast speed columns and saved per-profile position, independent of total-weight telemetry. Existing user profiles retain their speed columns and manual fallback; no reference weights are guessed for them. Only the canonical weight_kg pair is used; obsolete ballast.auto mass_no_ballast_kg and mass_max_ballast_kg keys are ignored and omitted on re-save. VNE is one speed, saved as `vne_ms`. Validation (inline, with a summary box) requires strictly ascending speeds at both weight endpoints; buckets narrower than 4 kt warn, narrower than 2 kt are errors. The display shows an error/incomplete message instead of misleading data when a profile is not valid.
 
 ## Choices and deviations worth knowing
-- Schema ids are `flaphappy.profile/3` and `flaphappy.settings/1`. Files with another schema id are rejected.
+- Schema ids are `flaphappy.profile/3` and `flaphappy.settings/1`. Files with another schema id are rejected. The optional `weight_kg` object stores `light` and `heavy` loaded masses in kg. Older app versions can read the existing speed data but do not preserve the new weight anchors if they re-save a profile.
 - Minimum window content width is 560 px, growing with the flap count (`N*64+256`), so very large N scales instead of getting unreadable.
 - Extra warnings were added when the profile has more rows than the sim reports handle positions for ("live count" check).
 - The renderer is compiled with esbuild target `es2015` (not newer) to match the Coherent engine.
@@ -101,8 +101,8 @@ A profile has N flap rows (any N from 0 up; each row: label and a sim index you 
 - The dev panel, scenarios and fault injection (index missing/out of range, percent only, L: var only, unreadable, stale) exist so the whole fallback chain can be exercised without the sim.
 
 ## Tests
-- `npm test`: 97 unit tests (profile model, validation, ballast and scale math, flap resolver, display model, file store, simulated source, scenarios incl. a 20-minute soak, replay, CLI parsing).
-- `npm run test:ui`: 30 tests in a real browser (display for N = 0/1/2/6/10, states, fallbacks, ballast slider, editor, import errors, dev panel, compact) and in a real Electron window under simulated and replay sources (real files, restart persistence, compact window with no MINI/FULL button, recording).
+- `npm test`: 106 unit tests (profile model, validation, ballast and scale math, flap resolver, display model, file store, simulated source, scenarios incl. a 20-minute soak, replay, CLI parsing).
+- `npm run test:ui`: 32 tests in a real browser (display for N = 0/1/2/6/10, states, fallbacks, read-only weight indicator, editor, import errors, dev panel, compact) and in a real Electron window under simulated and replay sources (real files, restart persistence, compact window with no MINI/FULL button, recording).
 
 ## Only verifiable on Windows with MSFS 2024
 Everything above runs and is tested without the sim. These need a real Windows machine and MSFS:
