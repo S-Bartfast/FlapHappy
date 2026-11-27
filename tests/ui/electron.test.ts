@@ -181,6 +181,29 @@ describe.skipIf(!canRun)('Electron shell (simulated source): window, files, rest
       }
       await verify(300, ['40','52','82']);
       await verify(500, ['45','59','82']);
+      await page.click('.fh-cog');
+      await page.waitForSelector('[data-weight-unit="lb"]');
+      await page.click('[data-weight-unit="lb"]');
+      expect(await page.locator('[data-path="weight_kg.light"]').inputValue()).toBe('882');
+      expect(await page.locator('[data-path="weight_kg.heavy"]').inputValue()).toBe('1323');
+      expect(await page.locator('.fh-liveline').textContent()).toContain('1102 lb');
+      await page.fill('[data-path="weight_kg.light"]','1000');
+      await page.click('.fh-settings .fh-save');
+      await page.waitForFunction(() => document.querySelector('.fh-savestate')?.textContent === 'Saved and applied');
+      expect(JSON.parse(fs.readFileSync(path.join(ud, 'profiles', fixture.id + '.json'), 'utf8')).weight_kg.light).toBe(453.59);
+      await page.fill('[data-path="weight_kg.light"]','882');
+      await page.click('[data-weight-unit="kg"]');
+      await page.fill('[data-path="weight_kg.light"]','400');
+      await page.click('.fh-settings .fh-save');
+      await page.waitForFunction(() => document.querySelector('.fh-savestate')?.textContent === 'Saved and applied');
+      await page.click('[data-weight-unit="lb"]');
+      await page.click('.fh-settings .fh-back');
+      for (const view of [page, panel]) {
+        await view.waitForFunction(() => document.querySelector('.fh-sl-pct')?.textContent === '1102 lb');
+      }
+      await page.click('.fh-cog');
+      await page.click('[data-weight-unit="kg"]');
+      await page.click('.fh-settings .fh-back');
       await verify(800, ['50','66','82']);
       expect((await fetch(panelUrl + '/api/ballast', { method: 'POST', body: '{"f":0}' })).status).toBe(405);
       await verify(null, []);

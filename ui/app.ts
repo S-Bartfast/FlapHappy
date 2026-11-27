@@ -346,6 +346,12 @@ export class App {
     this.renderAll();
   }
 
+  setWeightUnit(unit: 'kg' | 'lb'): void {
+    this.settings.weight_unit = unit;
+    this.persistSoon();
+    this.renderAll();
+  }
+
   setHeightUnit(unit: 'ft' | 'm'): void {
     this.settings.height = unit;
     this.persistSoon();
@@ -517,7 +523,7 @@ export class App {
     if (!this.strip) return;
     const model = this.buildModelFor(this.profile, this.validation);
     this.lastModel = model;
-    this.slider.render(this.profile, model.weight, this.ballast);
+    this.slider.render(this.profile, model.weight, this.ballast, this.settings.weight_unit);
     this.strip.render(model, { profile: this.profile, zoom: this.settings.ui.zoom, showBallast: this.settings.ui.show_ballast, showAgl: this.settings.ui.show_agl, showTransitions: this.settings.ui.show_transitions, showWind: this.settings.ui.show_wind, barShading: this.settings.ui.bar_shading });
     setText(this.titleEl, this.profile ? profileLabel(this.profile.id) : 'Flap Happy');
     const bits: string[] = [];
@@ -543,6 +549,7 @@ export class App {
       receivedAt: this.lastRx,
       ballast: this.ballast.f,
       units: this.settings.units === 'kmh' ? 'kmh' : 'kt',
+      weightUnit: this.settings.weight_unit,
       height: this.settings.height === 'm' ? 'm' : 'ft',
       agl: this.settings.agl,
       zoom: this.settings.ui.zoom,

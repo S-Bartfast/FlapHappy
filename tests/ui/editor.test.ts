@@ -168,6 +168,10 @@ describe('settings editor: row rules, validation, undo', () => {
     expect(await page.$eval('.fh-settings .fh-liveline', (e) => e.textContent)).toBe('Live: handle index 1 of 4 [flap "2"] · Aircraft weight: 537 kg');
     expect(await page.$$eval('.fh-settings .fh-frow.live', (e) => e.length)).toBe(1);
     const readout = page.locator('.fh-settings .fh-liveline');
+    await page.click('[data-weight-unit="lb"]');
+    expect(await readout.textContent()).toContain('1184 lb');
+    await page.click('[data-weight-unit="kg"]');
+    expect(await readout.textContent()).toContain('537 kg');
     await sim(page, { totalWeightKg: 820.8 });
     await page.waitForFunction(() => document.querySelector('.fh-liveline')?.textContent?.includes('821 kg'));
     await sim(page, { totalWeightKg: null });

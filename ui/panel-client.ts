@@ -78,7 +78,7 @@ function paint(state: CockpitState): void {
     height: state.height === 'm' ? 'm' : 'ft',
     agl: aglFromState(state),
   });
-  slider.render(profile, model.weight, { f: typeof f === 'number' && isFinite(f) ? Math.max(0, Math.min(1, f)) : profile.ballast.default_fraction, unconfirmed: false, restored: false });
+  slider.render(profile, model.weight, { f: typeof f === 'number' && isFinite(f) ? Math.max(0, Math.min(1, f)) : profile.ballast.default_fraction, unconfirmed: false, restored: false }, state.weightUnit === 'lb' ? 'lb' : 'kg');
   strip.render(model, { profile, zoom: state.zoom, showBallast: state.showBallast !== false, showAgl: state.showAgl !== false, showTransitions: state.showTransitions === true, showWind: state.showWind !== false, barShading: state.barShading !== false });
 }
 

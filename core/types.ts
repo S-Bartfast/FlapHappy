@@ -100,6 +100,7 @@ export interface Settings {
   units: 'kt' | 'kmh';
   /** How height above ground is shown. */
   height: 'ft' | 'm';
+  weight_unit: 'kg' | 'lb';
   /** AGL bar ends and the green band, in feet. */
   agl: { bottom_m: number; top_m: number; low_m: number; high_m: number };
   ui: {

@@ -151,6 +151,8 @@ export function normalizeProfile(input: unknown): ParseResult {
   const cfIn = isObj(r.current_flap) ? r.current_flap : {};
   const matchIn = isObj(r.match) ? r.match : {};
   const autoIn = isObj(ballastIn.auto) ? stripUnderscore(ballastIn.auto) : {};
+  delete autoIn.mass_no_ballast_kg;
+  delete autoIn.mass_max_ballast_kg;
   const src = cfIn.source;
 
   const profile: Profile = {
@@ -228,7 +230,7 @@ export function exportProfileJson(p: Profile): string {
     vs_min: speedToFile(p.vs_min),
     transitions: p.transitions.map(speedToFile),
     vne_ms: p.vne === null ? null : knotsToMs(p.vne),
-    weight_kg: p.weight_kg,
+    weight_kg: { light: p.weight_kg.light === null ? null : Math.round(p.weight_kg.light * 100) / 100, heavy: p.weight_kg.heavy === null ? null : Math.round(p.weight_kg.heavy * 100) / 100 },
     ballast: p.ballast,
     current_flap: p.current_flap,
     marker_smoothing_ms: p.marker_smoothing_ms,
