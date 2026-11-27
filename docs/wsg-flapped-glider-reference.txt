@@ -47,7 +47,7 @@ Native Flap Happy field mapping (profile schema flaphappy.profile/3):
   published AS33-18-GF 5 -> N transition, the fragment is:
     {"no_ballast_ms": 26.39, "max_ballast_ms": 29.72}
   The same field names are used under vs_min for stall IAS, when supplied.
-  PR #1 (c90f611) additionally supports optional loaded reference weights:
+  Native master (82dae69, merged PR #1) supports optional loaded reference weights:
     "weight_kg": {"light": 485, "heavy": 600}
   Both valid weights select live weight; older profiles without both use
   manual ballast. These fragments illustrate units/fields only, not a complete
