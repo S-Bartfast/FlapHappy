@@ -34,6 +34,9 @@ Settings. Closing the main window exits the app and closes the external panel to
 A second launch (or `--show`) restores the existing main window; `--quit` exits the session.
 The previous experimental windowless launch flag is no longer a windowless mode.
 
+### Auto-hide in external views (optional)
+
+In Settings → Window and app, enable **Auto-hide from external views (in-sim panel only)**. It defaults off. Reinstall the cockpit panel from Settings to update an older installed wrapper. The panel stays loaded and becomes visible again in cockpit view. The desktop display is unaffected. The implementation recognizes the SDK's named chase, fixed, environment, showcase and drone states; ambiguous/unknown values remain visible. The [MSFS 2024 Camera Variables documentation](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simvars/camera-variables/) inconsistently describes value 9, so it is not used as proof of an external view. Live MSFS and VR validation is still needed.
 ### First use
 1. Click **Settings and profiles** in the main window. The same button becomes **Close settings**.
    Only one **Save** button is shown; closing the editor retains an unsaved profile draft for later saving.
