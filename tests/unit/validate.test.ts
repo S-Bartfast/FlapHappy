@@ -72,20 +72,18 @@ describe('validateProfile', () => {
     expect(v.warnings.map((e) => e.code)).toContain('bucket-narrow');
   });
 
-  it('structure: labels, indices, duplicates', () => {
+  it('structure: labels', () => {
     const p = makeProfile(3);
     p.flaps[0].label = '';
     p.flaps[1].label = '3';
-    p.flaps[2].handle_index = 1;
     p.flaps[2].label = 'toolong7';
     const c = codes(p);
     expect(c).toContain('label-empty');
     expect(c).toContain('label-long');
-    expect(c).toContain('index-duplicate');
     expect(validateProfile(p).structureOk).toBe(false);
   });
 
-  it('warns about long labels, direction, many rows, out-of-range indices', () => {
+  it('warns about long labels, direction, many rows, more rows than handle positions', () => {
     const p = makeProfile(11);
     p.flaps[0].label = 'abcde';
     p.transitions[3].max_ballast_kt = (p.transitions[3].no_ballast_kt as number) - 0; // equal: not a direction warning

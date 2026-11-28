@@ -1,5 +1,6 @@
 import type { CurrentFlapSource, Profile } from './types';
 import type { SimSample } from './sim';
+import { handleIndexOf, rowForHandle } from './profile';
 
 export type FlapStatus =
   /** Live flap matches a bar row: `rowIndex` is the highlighted cell. */
@@ -30,7 +31,7 @@ function isValidIndex(idx: number | null, count: number | null): idx is number {
 }
 
 function lookupIndex(p: Profile, idx: number): CurrentFlap | null {
-  const row = p.flaps.findIndex((r) => r.handle_index === idx);
+  const row = rowForHandle(p, idx);
   if (row >= 0) return { status: 'row', rowIndex: row, label: p.flaps[row].label, handleIndex: idx, via: null };
   return { status: 'unlisted', rowIndex: null, label: '#' + idx, handleIndex: idx, via: null };
 }
@@ -68,7 +69,7 @@ export class CurrentFlapResolver {
     for (const src of order) {
       if (src === 'index') {
         if (isValidIndex(s.flapIndex, count)) {
-          result = lookupIndex(p, s.flapIndex);
+          result = lookupIndex(p, Math.round(s.flapIndex));
           if (result) result.via = 'index';
         }
       } else if (src === 'percent') {
@@ -91,7 +92,7 @@ export class CurrentFlapResolver {
 
     if (!result && p.current_flap.manual_fallback && this.manual !== null && this.manual < p.flaps.length) {
       const row = p.flaps[this.manual];
-      result = { status: 'row', rowIndex: this.manual, label: row.label, handleIndex: row.handle_index, via: 'manual' };
+      result = { status: 'row', rowIndex: this.manual, label: row.label, handleIndex: handleIndexOf(p, this.manual), via: 'manual' };
     }
     return result ?? unknown;
   }

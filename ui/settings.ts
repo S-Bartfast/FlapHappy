@@ -4,8 +4,10 @@ import {
   cloneProfile,
   deleteRow,
   exportProfileJson,
+  handleIndexOf,
   moveLabel,
   profileLabel,
+  rowForHandle,
   transitionName,
 } from '../core/profile';
 import { formatSpeedField, heightToMetres, heightUnitLabel, metresToHeight, unitLabel, unitToKnots, type SpeedUnit, type WeightUnit, type WindUnit, formatWeightField, weightToKilograms, kilogramsToWeight } from '../core/units';
@@ -73,7 +75,7 @@ export class SettingsView {
     this.el = h(
       'div',
       { class: 'fh-settings' },
-      h('div', { class: 'fh-sethead' }, back, h('div', { class: 'fh-settitle' }, 'Settings'), this.saveBtn, this.saveState),
+      h('div', { class: 'fh-sethead' }, back, h('div', { class: 'fh-settitle' }, 'Settings'), this.saveState, this.saveBtn),
       this.profileBar,
       this.banner,
       this.table,
@@ -286,17 +288,18 @@ export class SettingsView {
       const n = numberOrNull(text);
       return n === null ? null : unitToKnots(n, unit);
     };
+    const withUnit = (inp: HTMLInputElement, text = unitLabel(unit), cls = '') => h('span', { class: 'fh-speedbox' + cls }, inp, h('span', { class: 'fh-insuffix', 'aria-hidden': 'true' }, h('span', {}, text)));
+    const [lightName, heavyName] = this.weightMode === 'live' ? ['Min weight', 'Max weight'] : ['No ballast', 'Max ballast'];
     const speedRow = (title: string, cls: string, nameEl: HTMLElement | null, get: () => { no_ballast_kt: number | null; max_ballast_kt: number | null }, path: string, isEnd: boolean) => {
       const s = get();
       return h(
         'div',
         { class: 'fh-erow fh-speedrow ' + cls },
         nameEl ?? h('div', { class: 'fh-rowname' }, title),
-        h('label', { class: 'fh-sub' }, 'Light / None'),
-        this.fieldInput(path + '.no_ballast_kt', formatSpeedField(s.no_ballast_kt, unit), { cls: 'fh-speed', step: '1', onInput: (t) => { get().no_ballast_kt = storeSpeed(t); }, label: title + ' Light weight / No Ballast' }),
-        h('label', { class: 'fh-sub' }, 'Heavy / Max'),
-        this.fieldInput(path + '.max_ballast_kt', formatSpeedField(s.max_ballast_kt, unit), { cls: 'fh-speed', step: '1', placeholder: isEnd ? 'same' : '', onInput: (t) => { get().max_ballast_kt = storeSpeed(t); }, label: title + ' Heavy weight / Max Ballast' }),
-        h('span', { class: 'fh-unit' }, unitLabel(unit)),
+        h('label', { class: 'fh-sub' }, lightName),
+        withUnit(this.fieldInput(path + '.no_ballast_kt', formatSpeedField(s.no_ballast_kt, unit), { cls: 'fh-speed', step: '1', onInput: (t) => { get().no_ballast_kt = storeSpeed(t); }, label: title + ' ' + lightName })),
+        h('label', { class: 'fh-sub' }, heavyName),
+        withUnit(this.fieldInput(path + '.max_ballast_kt', formatSpeedField(s.max_ballast_kt, unit), { cls: 'fh-speed', step: '1', placeholder: isEnd ? 'same' : '', onInput: (t) => { get().max_ballast_kt = storeSpeed(t); }, label: title + ' ' + heavyName })),
       );
     };
 
@@ -304,15 +307,16 @@ export class SettingsView {
       h('option', { value: 'manual' }, 'Manual ballast slider'), h('option', { value: 'live' }, 'Live flying weight')) as HTMLSelectElement;
     // The DOM helper sets value before appending options; select explicitly afterwards.
     mode.value = this.weightMode;
-    this.table.appendChild(h('div', { class: 'fh-erow' }, h('label', { class: 'fh-rowname' }, 'Weight mode'), mode));
-    if (this.weightMode === 'live') this.table.appendChild(h('div', { class: 'fh-erow' },
-      h('label', { class: 'fh-rowname' }, 'Flying weights (' + this.app.displayUnits.weight_unit + ')'),
-      h('label', { class: 'fh-sub' }, 'Light'),
-      this.fieldInput('weight_kg.light', formatWeightField(d.weight_kg.light, this.app.displayUnits.weight_unit), { cls: 'fh-speed', step: '1', label: 'Light flying weight (' + this.app.displayUnits.weight_unit + ')', onInput: (t) => { const v = numberOrNull(t); d.weight_kg.light = v === null ? null : weightToKilograms(v, this.app.displayUnits.weight_unit); } }),
+    const modeRow = h('div', { class: 'fh-erow' }, h('label', { class: 'fh-rowname' }, 'Weight mode'), mode);
+    this.table.appendChild(modeRow);
+    if (this.weightMode === 'live') modeRow.append(
+      h('label', { class: 'fh-sub fh-weightlab' }, 'Light'),
+      withUnit(this.fieldInput('weight_kg.light', formatWeightField(d.weight_kg.light, this.app.displayUnits.weight_unit), { cls: 'fh-speed', step: '1', label: 'Light flying weight (' + this.app.displayUnits.weight_unit + ')', onInput: (t) => { const v = numberOrNull(t); d.weight_kg.light = v === null ? null : weightToKilograms(v, this.app.displayUnits.weight_unit); } }), this.app.displayUnits.weight_unit, ' fh-weightbox'),
       h('label', { class: 'fh-sub' }, 'Heavy'),
-      this.fieldInput('weight_kg.heavy', formatWeightField(d.weight_kg.heavy, this.app.displayUnits.weight_unit), { cls: 'fh-speed', step: '1', label: 'Heavy flying weight (' + this.app.displayUnits.weight_unit + ')', onInput: (t) => { const v = numberOrNull(t); d.weight_kg.heavy = v === null ? null : weightToKilograms(v, this.app.displayUnits.weight_unit); } })));
-    this.table.appendChild(h('div', { class: 'fh-hint' }, this.weightMode === 'live' ? 'Enter both positive loaded weights (Light below Heavy) before saving. The display uses live MSFS aircraft weight.' : 'No flying weights are required. The display uses the saved manual slider position with the No/Max Ballast speeds.'));
-    this.table.appendChild(speedRow('Min (stall)', 'fh-minrow', null, () => d.vs_min, 'vs_min', true));
+      withUnit(this.fieldInput('weight_kg.heavy', formatWeightField(d.weight_kg.heavy, this.app.displayUnits.weight_unit), { cls: 'fh-speed', step: '1', label: 'Heavy flying weight (' + this.app.displayUnits.weight_unit + ')', onInput: (t) => { const v = numberOrNull(t); d.weight_kg.heavy = v === null ? null : weightToKilograms(v, this.app.displayUnits.weight_unit); } }), this.app.displayUnits.weight_unit, ' fh-weightbox'));
+    this.table.appendChild(h('div', { class: 'fh-hint' }, this.weightMode === 'live' ? 'Enter both positive loaded weights (Light below Heavy) before saving. The display uses live MSFS aircraft weight.' : 'No flying weights are required. The display uses the saved manual slider position with the No ballast and Max ballast speeds.'));
+    // Built slowest first (the profile's order), then shown fastest at the top.
+    const rows: HTMLElement[] = [speedRow('Min (stall)', 'fh-minrow', null, () => d.vs_min, 'vs_min', true)];
 
     d.flaps.forEach((row, i) => {
       const labelIn = this.fieldInput(`flaps[${i}].label`, row.label, {
@@ -325,32 +329,20 @@ export class SettingsView {
         },
       });
       labelIn.setAttribute('maxlength', '8');
-      const indexIn = this.fieldInput(`flaps[${i}].handle_index`, row.handle_index === null ? '' : String(row.handle_index), {
-        cls: 'fh-handle',
-        step: '1',
-        label: 'Flap ' + (i + 1) + ' sim index',
-        onInput: (t) => {
-          const n = numberOrNull(t);
-          row.handle_index = n === null ? null : Math.round(n);
-          frow.setAttribute('data-handle', row.handle_index === null ? '' : String(row.handle_index));
-        },
-      });
-      indexIn.setAttribute('min', '0');
       const frow = h(
         'div',
-        { class: 'fh-erow fh-frow', 'data-handle': row.handle_index === null ? '' : String(row.handle_index), title: 'Drag to reorder' },
+        { class: 'fh-erow fh-frow', 'data-handle': String(handleIndexOf(d, i)), title: 'Drag to reorder' },
         h('span', { class: 'fh-grip', 'aria-hidden': 'true' }, '\u2630'),
         h('label', { class: 'fh-sub' }, 'Label'),
         labelIn,
-        h('label', { class: 'fh-sub' }, 'Sim index'),
-        indexIn,
+        h('span', { class: 'fh-sub fh-simidx' }, 'Sim index: ' + handleIndexOf(d, i)),
         h('span', { class: 'fh-rowbtns' },
           h('button', { class: 'fh-btn fh-remove', type: 'button', title: 'Remove this flap row', 'aria-label': 'Remove row', onclick: () => this.mutate(deleteRow(d, i), 'Deleted row "' + row.label + '"') }, '\u00d7'),
         ),
       );
       this.armRowDrag(frow, i);
       this.rowEls.push(frow);
-      this.table.appendChild(frow);
+      rows.push(frow);
       if (i < n - 1) {
         const nameEl = h('div', { class: 'fh-rowname fh-transname' }, 'Transition ' + transitionName(d, i));
         this.transNames.push(nameEl);
@@ -362,7 +354,8 @@ export class SettingsView {
           toggleClass(trow, 'fh-transition-hidden', !shown);
           for (const field of speedFields) {
             field.hidden = !shown;
-            if (field instanceof HTMLInputElement) field.disabled = !shown;
+            const input = field.querySelector('input');
+            if (input) input.disabled = !shown;
           }
         };
         nameEl.id = `fh-transition-name-${i}`;
@@ -376,32 +369,34 @@ export class SettingsView {
             this.edited(false);
           } });
         const control = h('label', { class: 'fh-transition-toggle', title: 'Turn off to merge adjacent flap bands without deleting transition speeds' },
-          h('span', { id: labelId }, 'Show divider'),
+          h('span', { id: labelId, hidden: true }, 'Show divider'),
           h('span', { class: 'fh-slide' }, check, h('span', { class: 'fh-slidetrack', 'aria-hidden': 'true' }, h('span', { class: 'fh-slideknob' }))));
-        trow.insertBefore(control, speedFields[0]);
+        trow.insertBefore(control, trow.firstChild);
         paint(shown);
-        this.table.appendChild(h('div', { class: 'fh-twrap' }, trow));
+        rows.push(h('div', { class: 'fh-twrap' }, trow));
       }
     });
     if (n > 0) {
-      this.table.appendChild(h(
+      rows.push(h(
         'div',
         { class: 'fh-erow fh-speedrow fh-maxrow' },
         h('div', { class: 'fh-rowname' }, 'Max (Vne)'),
         h('div', { class: 'fh-vneval' },
-          this.fieldInput('vne', formatSpeedField(d.vne, unit), {
+          withUnit(this.fieldInput('vne', formatSpeedField(d.vne, unit), {
             cls: 'fh-speed',
             step: '1',
             label: 'Max (Vne)',
             onInput: (t) => {
               d.vne = storeSpeed(t);
             },
-          }),
-          h('span', { class: 'fh-unit' }, unitLabel(unit)),
+          })),
         ),
       ));
+      for (let k = rows.length - 1; k >= 0; k--) this.table.appendChild(rows[k]);
+    } else {
+      this.table.appendChild(rows[0]);
+      this.table.appendChild(h('div', { class: 'fh-hint' }, 'No flap rows: the display shows "no flaps". Add a row to start.'));
     }
-    else this.table.appendChild(h('div', { class: 'fh-hint' }, 'No flap rows: the display shows "no flaps". Add a row to start.'));
   }
 
   private selectWeightMode(mode: WeightMode): void {
@@ -439,10 +434,12 @@ export class SettingsView {
         moved = true;
         drop = nearestSlot(slots, y);
         toggleClass(row, 'fh-dragging', true);
+        // Rows are shown fastest first, so a faster target (higher index) opens above, a slower one below.
         this.rowEls.forEach((el, k) => {
           const open = k === drop && k !== from;
           toggleClass(el, 'fh-drop', open);
-          el.style.marginTop = open ? gap + 'px' : '';
+          el.style.marginTop = open && k > from ? gap + 'px' : '';
+          el.style.marginBottom = open && k < from ? gap + 'px' : '';
         });
         ghost = placeGhost(row, ghost, x, y);
       };
@@ -459,6 +456,7 @@ export class SettingsView {
           this.rowEls.forEach((el) => {
             toggleClass(el, 'fh-drop', false);
             el.style.marginTop = '';
+            el.style.marginBottom = '';
           });
         }
       };
@@ -557,7 +555,7 @@ export class SettingsView {
     let liveIdx: number | null = null;
     if (s && s.connected && s.flapIndex !== null) {
       liveIdx = Math.round(s.flapIndex);
-      const row = !editingOther && d ? d.flaps.find((r) => r.handle_index === liveIdx) : undefined;
+      const row = !editingOther && d ? d.flaps[rowForHandle(d, liveIdx)] : undefined;
       live = `Live: handle index ${liveIdx}` + (s.flapCount !== null ? ` of ${s.flapCount}` : '') + (row ? ` [flap "${row.label}"]` : '');
     }
     const kg = liveWeight(null, s, deriveLink(s, app.lastRx, Date.now()) === 'live').kg;
