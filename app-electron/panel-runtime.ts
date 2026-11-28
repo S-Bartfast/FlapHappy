@@ -102,7 +102,7 @@ export class PanelRuntime {
   private applyDisplayPreferences(): void {
     const s = this.preferences;
     this.state = { ...this.state, units: s.units, weightUnit: s.weight_unit, height: s.height, agl: s.agl, zoom: s.ui.zoom,
-      showBallast: s.ui.show_ballast, showAgl: s.ui.show_agl, simpleFlap: s.ui.simple_flap, highlightRecommended: s.ui.highlight_recommended, showTransitions: s.ui.show_transitions,
+      showBallast: s.ui.show_ballast, showAgl: s.ui.show_agl, simpleFlap: s.ui.simple_flap, highlightRecommended: s.ui.highlight_recommended, autoHideExternal: s.ui.auto_hide_external, showTransitions: s.ui.show_transitions,
       showWind: s.ui.show_wind, barShading: s.ui.bar_shading };
   }
 

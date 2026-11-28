@@ -28,6 +28,8 @@ export interface CockpitState {
   showAgl: boolean;
   /** Missing on an older desktop app means ordinary ribbon mode. */
   simpleFlap?: boolean;
+  /** Optional for older apps; applied by the in-sim toolbar wrapper only. */
+  autoHideExternal?:boolean;
   showTransitions: boolean;
   highlightRecommended?:boolean;
   showWind: boolean;
