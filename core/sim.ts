@@ -5,6 +5,8 @@ export interface SimSample {
   connected: boolean;
   inFlight: boolean;
   iasKt: number | null;
+  /** Actual loaded aircraft weight in kilograms. Null when unavailable. */
+  totalWeightKg: number | null;
   /** Height above the ground, in feet. `PLANE ALT ABOVE GROUND`. */
   aglFt: number | null;
   /** Ambient wind speed, in knots. `AMBIENT WIND VELOCITY`. */
@@ -25,6 +27,7 @@ export function emptySample(t = 0): SimSample {
     connected: false,
     inFlight: false,
     iasKt: null,
+    totalWeightKg: null,
     aglFt: null,
     windKt: null,
     onGround: null,
@@ -73,6 +76,9 @@ export interface HostInfo {
   source: 'simconnect' | 'simulated' | 'replay';
   /** Show the dev control panel. */
   dev: boolean;
+  /** Electron control window; telemetry and optional ribbon are hosted by the main process. */
+  mainWindow?: boolean;
+  panelAvailable?: boolean;
   version: string;
   platform: string;
 }
@@ -89,4 +95,6 @@ export interface Host {
   quit(): void;
   /** Copy the in-sim toolbar panel into the MSFS Community folder. Returns a status message. */
   installCockpitPanel(): Promise<string>;
+  setExternalPanel?(on: boolean): Promise<boolean>;
+  getExternalPanel?(): Promise<boolean>;
 }

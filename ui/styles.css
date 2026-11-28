@@ -28,7 +28,7 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-label { width: 96px; flex: none; font-size: 22px; font-weight: 600; color: #9fb0c3; letter-spacing: 0.5px; }
 .fh-gr { width: 128px; flex: none; padding-left: 12px; }
 .fh-unit { font-size: 20px; color: #6f8196; }
-.fh-ballast-row .fh-label { font-size: 17px; letter-spacing: 0; }
+.fh-weight-row .fh-label, .fh-ballast-row .fh-label { font-size: 17px; letter-spacing: 0; }
 
 .fh-track { flex: 1; position: relative; height: 44px; background: #161d28; border-radius: 0; overflow: hidden; border: 1px solid #2a3647; }
 .fh-cols { position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
@@ -87,10 +87,11 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-ticktext { position: absolute; top: 0; font-size: 20px; color: #9fb0c3; -webkit-transform: translateX(-50%); transform: translateX(-50%); -webkit-transition: left 0.15s ease; transition: left 0.15s ease; }
 .fh-ticktext.last { -webkit-transform: translateX(-100%); transform: translateX(-100%); }
 
-.fh-ballast-row { margin-top: 6px; }
+.fh-weight-row, .fh-ballast-row { margin-top: 6px; }
 .fh-sl { flex: 1; display: flex; align-items: center; min-width: 40px; }
 .fh-sl-trackwrap { flex: 1; height: 40px; padding: 0 14px; display: flex; align-items: center; min-width: 40px; }
-.fh-sl-track { position: relative; width: 100%; height: 12px; background: #1d2733; border-radius: 6px; border: 1px solid #3a475a; cursor: pointer; }
+.fh-sl-track { position: relative; width: 100%; height: 12px; background: #1d2733; border-radius: 6px; border: 1px solid #3a475a; cursor: default; }
+.fh-ballast-row .fh-sl-track { cursor: pointer; }
 .fh-sl-track:before { content: ""; position: absolute; left: 0; right: 0; top: -14px; bottom: -14px; }
 .fh-sl-fill { position: absolute; left: 0; top: 0; bottom: 0; background: #2f8fd8; border-radius: 6px; }
 .fh-sl-thumb { position: absolute; top: -9px; width: 28px; height: 28px; margin-left: -14px; border-radius: 14px; background: #fff; border: 2px solid #2f8fd8; -webkit-transition: left 0.08s ease; transition: left 0.08s ease; }
@@ -107,7 +108,7 @@ button, input, select { font-family: inherit; font-size: 14px; }
 
 /* --------------------------------------------------------- Settings editor */
 .fh-settings-host { display: none; }
-.fh-settings { max-width: 1100px; margin: 0 auto; padding-bottom: 40px; }
+.fh-settings { width:100%; min-width:0; margin:0; padding-bottom: 40px; }
 .fh-sethead { display: flex; align-items: center; margin-bottom: 8px; }
 .fh-sethead .fh-back { margin-left: 0; }
 .fh-settitle { font-size: 18px; font-weight: 600; margin-left: 14px; flex: 1; }
@@ -119,8 +120,8 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-prow label { color: #9fb0c3; width: 50px; }
 .fh-toggles { margin: 14px 0 18px 0; }
 .fh-optrow { display: flex; align-items: center; margin: 5px 0; }
-.fh-optrow .fh-unitlab { width: 148px; margin: 0; color: #9fb0c3; }
-.fh-optrow .fh-unitlab.fh-beside { width: auto; margin-left: 28px; margin-right: 8px; }
+.fh-optrow .fh-unitlab { flex:0 0 184px; max-width:100%; width:184px; margin: 0; color: #9fb0c3; }
+.fh-optrow .fh-unitlab.fh-beside { flex:0 0 auto; width:auto; margin-left: 28px; margin-right: 8px; }
 .fh-optrow .fh-unitlab.off, .fh-slide.off { opacity: 0.4; }
 .fh-units { margin-left: 0; display: flex; align-items: center; }
 .fh-slide { position: relative; display: block; width: 44px; height: 24px; margin: 0; }
@@ -219,3 +220,21 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-dev-title { width: 180px; }
 .fh-devrow .fh-btn { margin-left: 0; padding: 3px 8px; }
 .fh-devstate { color: #b8a77a; }
+
+/* Visible Electron control window; independent from the shared flight ribbon. */
+.fh-main-controls { border: 1px solid #243040; background: #11161e; padding: 16px; border-radius: 12px; margin-bottom: 12px; }
+.fh-main-controls h1 { font-size: 24px; margin: 0 0 8px; }
+.fh-main-copy { color: #a9b8c9; line-height: 1.4; margin: 0 0 14px; }
+.fh-main-actions { display: flex; flex-wrap: wrap; }
+.fh-main-actions .fh-btn { margin: 0 8px 8px 0; padding: 9px 14px; }
+.fh-external-toggle { background: #175c92; border-color: #3c92d4; }
+.fh-external-toggle:disabled { opacity: 0.45; cursor: default; }
+.fh-main-launch { display: flex; align-items: center; margin: 8px 0; }
+.fh-main-display .fh-header { -webkit-app-region: no-drag; }
+
+/* Keep the desktop controls within the available window width. */
+.fh-main-display,.fh-main-controls,.fh-settings-host{width:100%;min-width:0;max-width:100%;}
+.fh-settings .fh-prow,.fh-settings .fh-erow,.fh-settings .fh-arow,.fh-settings .fh-optrow{flex-wrap:wrap;}
+.fh-settings .fh-erow > *,.fh-settings .fh-prow > *,.fh-settings .fh-arow > *{max-width:100%;min-width:0;}
+.fh-settings .fh-wide{max-width:100%;min-width:0;}
+@media(max-width:420px){.fh-optrow .fh-unitlab{flex-basis:168px;width:168px;}.fh-settings .fh-arow>label:first-child{width:auto;flex:1 0 100%;}.fh-settings .fh-aglfield+.fh-aglfield{margin-left:0;}}

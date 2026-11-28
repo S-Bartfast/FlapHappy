@@ -8,8 +8,10 @@ import {
   profileLabel,
   transitionName,
 } from '../core/profile';
-import { formatSpeedField, heightToMetres, heightUnitLabel, metresToHeight, unitLabel, unitToKnots, type SpeedUnit } from '../core/units';
+import { formatSpeedField, heightToMetres, heightUnitLabel, metresToHeight, unitLabel, unitToKnots, type SpeedUnit, type WeightUnit, formatWeightField, weightToKilograms, kilogramsToWeight } from '../core/units';
 import { validateProfile } from '../core/validate';
+import { deriveLink } from '../core/display-model';
+import { canSaveWeightMode, liveWeight, profileForWeightMode, weightModeForProfile, type WeightMode } from '../core/weight';
 import { clear, fmtNum, h, numberOrNull, setText, toggleClass } from './dom';
 import type { App } from './app';
 
@@ -25,6 +27,9 @@ type Field = HTMLInputElement | HTMLSelectElement;
 export class SettingsView {
   readonly el: HTMLElement;
   private draft: Profile | null = null;
+  private weightMode: WeightMode = 'manual';
+  private previousWeights: Profile['weight_kg'] | null = null;
+  private saveAsBtn: HTMLButtonElement | null = null;
   private validation: ValidationResult | null = null;
   private prefilled: number[] = [];
   private undo: { profile: Profile; what: string } | null = null;
@@ -34,6 +39,8 @@ export class SettingsView {
   private saveBtn: HTMLButtonElement;
   private saveState: HTMLElement;
   private dirty = false;
+  private disposed = false;
+  private liveValidationContext = '';
 
   private profileBar: HTMLElement;
   private banner: HTMLElement;
@@ -61,7 +68,7 @@ export class SettingsView {
     this.advanced = h('div', { class: 'fh-advanced' });
     this.appBox = h('div', { class: 'fh-appbox' });
 
-    const back = h('button', { class: 'fh-btn fh-back', type: 'button', onclick: () => this.close() }, '\u2190 Back to display');
+    const back = app.info.mainWindow ? null : h('button', { class: 'fh-btn fh-back', type: 'button', onclick: () => this.close() }, '\u2190 Back to display');
     this.el = h(
       'div',
       { class: 'fh-settings' },
@@ -80,9 +87,11 @@ export class SettingsView {
 
   async init(): Promise<void> {
     await this.app.refreshMetas();
+    if (this.disposed) return;
     const imp = this.app.consumeImport();
     if (this.app.unsaved) this.draft = cloneProfile(this.app.unsaved);
     else if (this.app.profile) this.draft = cloneProfile(this.app.profile);
+    this.weightMode = this.app.unsaved ? this.app.unsavedWeightMode : weightModeForProfile(this.draft);
     this.dirty = !!this.app.unsaved;
     this.revalidate();
     this.renderAll();
@@ -97,8 +106,9 @@ export class SettingsView {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.endDrag();
-    if (this.dirty && this.draft) this.app.setUnsaved(this.draft);
+    if (this.dirty && this.draft) this.app.setUnsaved(this.draft, this.weightMode);
   }
 
   private close(): void {
@@ -108,7 +118,8 @@ export class SettingsView {
   // ------------------------------------------------------------------ Drafts
 
   private revalidate(): void {
-    this.validation = this.draft ? validateProfile(this.draft, { liveHandleCount: this.app.liveCount() }) : null;
+    const activeDraft = !this.app.info.mainWindow || this.draft?.id === this.app.profile?.id;
+    this.validation = this.draft ? validateProfile(this.draft, { liveHandleCount: activeDraft ? this.app.liveCount() : null, requireWeightAnchors: this.weightMode === 'live' }) : null;
   }
 
   /** After any edit: re-validate and refresh field states. The file is written only from Save. */
@@ -119,17 +130,19 @@ export class SettingsView {
     this.renderValidation();
     this.updateLive();
     this.dirty = true;
-    if (this.draft) this.app.setUnsaved(this.draft);
+    if (this.draft) this.app.setUnsaved(this.draft, this.weightMode);
     toggleClass(this.saveState, 'dirty', true);
     setText(this.saveState, 'Unsaved');
     this.paintSaveState();
   }
 
   async saveNow(): Promise<void> {
-    const d = this.draft;
-    if (!d) return;
+    const draft = this.draft;
+    if (!draft || !canSaveWeightMode(draft, this.weightMode)) return;
+    const d = profileForWeightMode(draft, this.weightMode);
+    this.draft = d;
     const applied = !!(this.validation && this.validation.ok);
-    const did = await this.app.saveProfile(d);
+    const did = await this.app.saveProfile(d, this.weightMode);
     this.dirty = false;
     toggleClass(this.saveState, 'dirty', false);
     setText(this.saveState, applied && did ? 'Saved and applied' : applied ? 'Saved' : 'Saved as incomplete. Not applied: fix errors');
@@ -138,12 +151,16 @@ export class SettingsView {
   }
 
   private paintSaveState(): void {
-    this.saveBtn.disabled = !this.dirty || !this.draft;
+    const canSave = canSaveWeightMode(this.draft, this.weightMode);
+    this.saveBtn.disabled = !this.dirty || !canSave;
+    if (this.saveAsBtn) this.saveAsBtn.disabled = !canSave;
     toggleClass(this.saveBtn, 'dirty', this.dirty);
   }
 
   private setDraft(p: Profile | null): void {
     this.draft = p;
+    this.weightMode = weightModeForProfile(p);
+    this.previousWeights = null;
     this.dirty = false;
     this.app.setUnsaved(null);
     this.prefilled = [];
@@ -206,13 +223,16 @@ export class SettingsView {
       h('button', { class: 'fh-btn fh-unitbtn' + (unit === id ? ' on' : ''), type: 'button', onclick: () => this.setUnits(id) }, label);
     const heightBtn = (id: 'ft' | 'm', label: string) =>
       h('button', { class: 'fh-btn fh-unitbtn' + (height === id ? ' on' : ''), type: 'button', onclick: () => this.setHeight(id) }, label);
+    const weight = app.settings.weight_unit;
+    const weightBtn = (id: WeightUnit) => h('button', { class: 'fh-btn fh-unitbtn' + (weight === id ? ' on' : ''), type: 'button', 'data-weight-unit': id, onclick: () => { app.setWeightUnit(id); this.renderProfileBar(); this.renderTable(); this.updateFieldStates(); this.updateLive(); } }, id);
     const shown = this.draft ? h('span', { class: 'fh-profilename' }, profileLabel(this.draft.id)) : null;
     const u = app.settings.ui;
     const sw = (cls: string, on: boolean, label: string, set: (v: boolean) => void, enabled = true) =>
       h('label', { class: 'fh-slide' + (enabled ? '' : ' off') }, h('input', { type: 'checkbox', class: cls, 'aria-label': label, checked: on, disabled: !enabled, onchange: (e: Event) => set((e.target as HTMLInputElement).checked) }), h('span', { class: 'fh-slidetrack' }, h('span', { class: 'fh-slideknob' })));
     const row = (label: string, control: HTMLElement) => h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, label), control);
-    const toggles = h('div', { class: 'fh-toggles' }, h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'Speed'), h('span', { class: 'fh-units' }, unitBtn('kt', 'kt'), unitBtn('kmh', 'km/h'))), h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'Altitude'), h('span', { class: 'fh-units fh-height' }, heightBtn('ft', 'ft'), heightBtn('m', 'm'))), row('Flap transitions', sw('fh-show-transitions', u.show_transitions, 'Flap transitions', (v) => app.setShowTransitions(v))), row('Ballast bar', sw('fh-show-ballast', u.show_ballast, 'Ballast bar', (v) => app.setShowBallast(v))), h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'AGL bar'), sw('fh-show-agl', u.show_agl, 'AGL bar', (v) => { app.setShowAgl(v); this.renderProfileBar(); }), h('span', { class: 'fh-unitlab fh-beside' + (u.show_agl ? '' : ' off') }, 'Wind speed'), sw('fh-show-wind', u.show_wind, 'Wind speed', (v) => app.setShowWind(v), u.show_agl)));
-    const profile = h('div', { class: 'fh-prow' }, h('label', null, 'Profile'), shown, files ? h('button', { class: 'fh-btn fh-open', type: 'button', onclick: () => void this.openFile() }, 'Open...') : null, files ? h('button', { class: 'fh-btn fh-saveas', type: 'button', onclick: () => void this.saveAs() }, 'Save As...') : null, app.host.capabilities.openFolder ? h('button', { class: 'fh-btn', type: 'button', onclick: () => app.host.openProfilesFolder() }, 'Open profiles folder') : null);
+    const toggles = h('div', { class: 'fh-toggles' }, h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'Speed'), h('span', { class: 'fh-units' }, unitBtn('kt', 'kt'), unitBtn('kmh', 'km/h'))), h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'Altitude'), h('span', { class: 'fh-units fh-height' }, heightBtn('ft', 'ft'), heightBtn('m', 'm'))), row('Weight', h('span', { class: 'fh-units' }, weightBtn('kg'), weightBtn('lb'))), row('Flap transitions', sw('fh-show-transitions', u.show_transitions, 'Flap transitions', (v) => app.setShowTransitions(v))), row('Weight / ballast bar', sw('fh-show-ballast', u.show_ballast, 'Weight / ballast bar', (v) => app.setShowBallast(v))), h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'AGL bar'), sw('fh-show-agl', u.show_agl, 'AGL bar', (v) => { app.setShowAgl(v); this.renderProfileBar(); }), h('span', { class: 'fh-unitlab fh-beside' + (u.show_agl ? '' : ' off') }, 'Wind speed'), sw('fh-show-wind', u.show_wind, 'Wind speed', (v) => app.setShowWind(v), u.show_agl)));
+    this.saveAsBtn = files ? h('button', { class: 'fh-btn fh-saveas', type: 'button', disabled: !canSaveWeightMode(this.draft, this.weightMode), onclick: () => void this.saveAs() }, 'Save As...') as HTMLButtonElement : null;
+    const profile = h('div', { class: 'fh-prow' }, h('label', null, 'Profile'), shown, files ? h('button', { class: 'fh-btn fh-open', type: 'button', onclick: () => void this.openFile() }, 'Open...') : null, this.saveAsBtn, app.host.capabilities.openFolder ? h('button', { class: 'fh-btn', type: 'button', onclick: () => app.host.openProfilesFolder() }, 'Open profiles folder') : null);
     this.profileBar.appendChild(toggles);
     this.profileBar.appendChild(profile);
     if (!this.draft) {
@@ -261,14 +281,26 @@ export class SettingsView {
         'div',
         { class: 'fh-erow fh-speedrow ' + cls },
         nameEl ?? h('div', { class: 'fh-rowname' }, title),
-        h('label', { class: 'fh-sub' }, 'No Ballast'),
-        this.fieldInput(path + '.no_ballast_kt', formatSpeedField(s.no_ballast_kt, unit), { cls: 'fh-speed', step: '1', onInput: (t) => { get().no_ballast_kt = storeSpeed(t); }, label: title + ' No Ballast' }),
-        h('label', { class: 'fh-sub' }, 'Max Ballast'),
-        this.fieldInput(path + '.max_ballast_kt', formatSpeedField(s.max_ballast_kt, unit), { cls: 'fh-speed', step: '1', placeholder: isEnd ? 'same' : '', onInput: (t) => { get().max_ballast_kt = storeSpeed(t); }, label: title + ' Max Ballast' }),
+        h('label', { class: 'fh-sub' }, 'Light / None'),
+        this.fieldInput(path + '.no_ballast_kt', formatSpeedField(s.no_ballast_kt, unit), { cls: 'fh-speed', step: '1', onInput: (t) => { get().no_ballast_kt = storeSpeed(t); }, label: title + ' Light weight / No Ballast' }),
+        h('label', { class: 'fh-sub' }, 'Heavy / Max'),
+        this.fieldInput(path + '.max_ballast_kt', formatSpeedField(s.max_ballast_kt, unit), { cls: 'fh-speed', step: '1', placeholder: isEnd ? 'same' : '', onInput: (t) => { get().max_ballast_kt = storeSpeed(t); }, label: title + ' Heavy weight / Max Ballast' }),
         h('span', { class: 'fh-unit' }, unitLabel(unit)),
       );
     };
 
+    const mode = h('select', { class: 'fh-in fh-weight-mode', 'aria-label': 'Flying weight mode', onchange: (e: Event) => this.selectWeightMode((e.target as HTMLSelectElement).value as WeightMode) },
+      h('option', { value: 'manual' }, 'Manual ballast slider'), h('option', { value: 'live' }, 'Live flying weight')) as HTMLSelectElement;
+    // The DOM helper sets value before appending options; select explicitly afterwards.
+    mode.value = this.weightMode;
+    this.table.appendChild(h('div', { class: 'fh-erow' }, h('label', { class: 'fh-rowname' }, 'Weight mode'), mode));
+    if (this.weightMode === 'live') this.table.appendChild(h('div', { class: 'fh-erow' },
+      h('label', { class: 'fh-rowname' }, 'Flying weights (' + this.app.settings.weight_unit + ')'),
+      h('label', { class: 'fh-sub' }, 'Light'),
+      this.fieldInput('weight_kg.light', formatWeightField(d.weight_kg.light, this.app.settings.weight_unit), { cls: 'fh-speed', step: '1', label: 'Light flying weight (' + this.app.settings.weight_unit + ')', onInput: (t) => { const v = numberOrNull(t); d.weight_kg.light = v === null ? null : weightToKilograms(v, this.app.settings.weight_unit); } }),
+      h('label', { class: 'fh-sub' }, 'Heavy'),
+      this.fieldInput('weight_kg.heavy', formatWeightField(d.weight_kg.heavy, this.app.settings.weight_unit), { cls: 'fh-speed', step: '1', label: 'Heavy flying weight (' + this.app.settings.weight_unit + ')', onInput: (t) => { const v = numberOrNull(t); d.weight_kg.heavy = v === null ? null : weightToKilograms(v, this.app.settings.weight_unit); } })));
+    this.table.appendChild(h('div', { class: 'fh-hint' }, this.weightMode === 'live' ? 'Enter both positive loaded weights (Light below Heavy) before saving. The display uses live MSFS aircraft weight.' : 'No flying weights are required. The display uses the saved manual slider position with the No/Max Ballast speeds.'));
     this.table.appendChild(speedRow('Min (stall)', 'fh-minrow', null, () => d.vs_min, 'vs_min', true));
 
     d.flaps.forEach((row, i) => {
@@ -335,6 +367,19 @@ export class SettingsView {
       ));
     }
     else this.table.appendChild(h('div', { class: 'fh-hint' }, 'No flap rows: the display shows "no flaps". Add a row to start.'));
+  }
+
+  private selectWeightMode(mode: WeightMode): void {
+    if (!this.draft || mode === this.weightMode || (mode !== 'manual' && mode !== 'live')) return;
+    if (mode === 'manual') {
+      this.previousWeights = { ...this.draft.weight_kg };
+      this.draft.weight_kg = { light: null, heavy: null };
+    } else if (this.previousWeights) {
+      this.draft.weight_kg = { ...this.previousWeights };
+    }
+    this.weightMode = mode;
+    this.edited(true);
+    this.table.querySelector<HTMLElement>('.fh-weight-mode')?.focus();
   }
 
   /** Drag a row (anywhere but its text field or buttons) to move its label. Mouse and touch only. */
@@ -463,15 +508,28 @@ export class SettingsView {
     const app = this.app;
     const d = this.draft;
     const s = app.lastSample;
+    const editingOther = app.info.mainWindow && !!d && d.id !== app.profile?.id;
+    if (app.info.mainWindow) {
+      const context = (d?.id ?? '') + ':' + (editingOther ? 'inactive' : app.liveCount());
+      if (context !== this.liveValidationContext) {
+        this.liveValidationContext = context;
+        this.revalidate();
+        this.updateFieldStates();
+        this.renderValidation();
+      }
+    }
     let live = 'Live: no sim data';
     let liveIdx: number | null = null;
     if (s && s.connected && s.flapIndex !== null) {
       liveIdx = Math.round(s.flapIndex);
-      const row = d ? d.flaps.find((r) => r.handle_index === liveIdx) : undefined;
+      const row = !editingOther && d ? d.flaps.find((r) => r.handle_index === liveIdx) : undefined;
       live = `Live: handle index ${liveIdx}` + (s.flapCount !== null ? ` of ${s.flapCount}` : '') + (row ? ` [flap "${row.label}"]` : '');
     }
-    setText(this.liveLine, live);
-    this.rowEls.forEach((r) => toggleClass(r, 'live', liveIdx !== null && r.getAttribute('data-handle') === String(liveIdx)));
+    const kg = liveWeight(null, s, deriveLink(s, app.lastRx, Date.now()) === 'live').kg;
+    const weight = kg === null ? 'unavailable' : `${Math.round(kilogramsToWeight(kg, app.settings.weight_unit))} ${app.settings.weight_unit}`;
+    setText(this.liveLine, `${live} · Aircraft weight: ${weight}`);
+    if (editingOther) this.liveLine.textContent += ' | Active flight profile: ' + (app.profile ? profileLabel(app.profile.id) : 'waiting') + ' (editing a separate draft)';
+    this.rowEls.forEach((r) => toggleClass(r, 'live', !editingOther && liveIdx !== null && r.getAttribute('data-handle') === String(liveIdx)));
   }
 
   // ------------------------------------------------------------ Advanced page
@@ -503,7 +561,7 @@ export class SettingsView {
       h('div', { class: 'fh-sub' }, 'The bar runs from Bottom to Top and turns green from Low to High.'),
       h('div', { class: 'fh-arow' }, aglField('Bottom', 'bottom_m'), aglField('Top', 'top_m')),
       h('div', { class: 'fh-arow' }, aglField('Low', 'low_m'), aglField('High', 'high_m')),
-      h('div', { class: 'fh-subtitle' }, 'Ballast slider'),
+      h('div', { class: 'fh-subtitle' }, 'Manual ballast fallback (profiles without both flying weights)'),
       h('div', { class: 'fh-arow' }, h('label', null, 'Default ballast'), h('input', { class: 'fh-in', type: 'number', min: '0', max: '100', step: '5', value: String(Math.round(d.ballast.default_fraction * 100)), oninput: (e: Event) => { const v = numberOrNull((e.target as HTMLInputElement).value); d.ballast.default_fraction = Math.max(0, Math.min(100, v ?? 0)) / 100; this.edited(false); } }), h('span', { class: 'fh-pct' }, '%')),
       h('div', { class: 'fh-arow' }, h('label', null, 'Drag snap'), h('input', { class: 'fh-in', type: 'number', min: '0', max: '100', step: '1', value: String(Math.round(d.ballast.drag_snap * 100)), oninput: (e: Event) => { const v = numberOrNull((e.target as HTMLInputElement).value); d.ballast.drag_snap = Math.max(0, Math.min(100, v ?? 0)) / 100; this.edited(false); } }), h('span', { class: 'fh-pct' }, '%')),
       h('div', { class: 'fh-subtitle' }, 'Aircraft'),
@@ -520,12 +578,12 @@ export class SettingsView {
     const caps = app.host.capabilities;
     const u = app.settings.ui;
     const rows: HTMLElement[] = [];
-    if (caps.alwaysOnTop) rows.push(h('div', { class: 'fh-arow' }, h('label', { class: 'fh-check' }, h('input', { type: 'checkbox', class: 'fh-aot', checked: u.always_on_top, onchange: (e: Event) => app.setAlwaysOnTop((e.target as HTMLInputElement).checked) }), ' Keep this window on top of the sim')));
-    if (caps.opacity) rows.push(h('div', { class: 'fh-arow' }, h('label', null, 'Opacity'), h('input', { type: 'range', min: '0.3', max: '1', step: '0.05', value: String(u.opacity), oninput: (e: Event) => app.setOpacity(Number((e.target as HTMLInputElement).value)) })));
+    if (caps.alwaysOnTop) rows.push(h('div', { class: 'fh-arow' }, h('label', { class: 'fh-check' }, h('input', { type: 'checkbox', class: 'fh-aot', checked: u.always_on_top, onchange: (e: Event) => app.setAlwaysOnTop((e.target as HTMLInputElement).checked) }), ' Keep the external panel on top of the sim')));
+    if (caps.opacity) rows.push(h('div', { class: 'fh-arow' }, h('label', null, 'External panel opacity'), h('input', { type: 'range', min: '0.3', max: '1', step: '0.05', value: String(u.opacity), oninput: (e: Event) => app.setOpacity(Number((e.target as HTMLInputElement).value)) })));
     rows.push(h('div', { class: 'fh-arow' }, h('label', null, 'Zoom'), h('input', { type: 'range', min: '0.5', max: '2', step: '0.1', value: String(u.zoom), oninput: (e: Event) => app.setZoom(Number((e.target as HTMLInputElement).value)) })));
     rows.push(h('div', { class: 'fh-arow' }, h('label', { class: 'fh-check' }, h('input', { type: 'checkbox', class: 'fh-demo', checked: u.demo_mode, onchange: (e: Event) => app.setDemoMode((e.target as HTMLInputElement).checked) }), ' Demo mode: use simulated data instead of the sim')));
     if (caps.files) {
-      const panelNote = h('div', { class: 'fh-hint' }, 'In VR, press Tab and open Flap Happy. The desktop app has to be running.');
+      const panelNote = h('div', { class: 'fh-hint' }, 'In VR, press Tab and open Flap Happy. The main application must be running; the external panel is optional.');
       rows.push(h('div', { class: 'fh-arow' }, h('button', { class: 'fh-btn', type: 'button', onclick: () => void app.host.installCockpitPanel().then((msg) => setText(panelNote, msg)) }, 'Install cockpit panel'), panelNote));
     }
     rows.push(h('div', { class: 'fh-hint' }, 'Version ' + app.info.version + ' | data source: ' + (app.usingSim ? 'simulated' : app.info.source)));
@@ -540,8 +598,9 @@ export class SettingsView {
   }
 
   private async saveAs(): Promise<void> {
-    if (!this.draft) return;
-    const ok = await this.app.host.saveJson(this.draft.id + '.flaphappy.json', exportProfileJson(this.draft));
+    if (!this.draft || !canSaveWeightMode(this.draft, this.weightMode)) return;
+    const p = profileForWeightMode(this.draft, this.weightMode);
+    const ok = await this.app.host.saveJson(p.id + '.flaphappy.json', exportProfileJson(p));
     setText(this.saveState, ok ? 'Exported' : 'Export cancelled');
   }
 
