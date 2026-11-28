@@ -270,3 +270,13 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-trow > [hidden] { display:none !important; }
 .fh-trow.fh-transition-hidden { background:#1b2027; border-color:#414852; }
 .fh-trow.fh-transition-hidden .fh-transname { color:#9da5b0; }
+
+/* Main control window only; the cockpit and external ribbon remain unchanged. */
+.fh-main-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px;}
+.fh-main-heading h1{margin:0;}
+.fh-main-grid{display:flex;flex-wrap:wrap;margin:-5px;}
+.fh-main-card{flex:1 1 220px;min-width:0;margin:5px;background:#0d121b;border:1px solid #2a3646;border-radius:8px;padding:12px;overflow-wrap:anywhere;}
+.fh-main-card h2{font-size:13px;font-weight:600;color:#a9b8c9;margin:0 0 8px;}
+.fh-main-card .fh-main-value,.fh-main-card .fh-title,.fh-main-card .fh-status{font-size:16px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;}
+.fh-main-card .fh-btn{margin:8px 0 0;max-width:100%;white-space:normal;}
+.fh-main-card .fh-main-launch{margin-bottom:0;}
