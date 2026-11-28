@@ -98,10 +98,11 @@ export interface Settings {
   active_by_title: Record<string, string>;
   ballast_by_profile: Record<string, number>;
   /** How speeds are shown. Profile files are stored in metres per second. */
-  units: 'kt' | 'kmh';
+  units: import('./units').SpeedUnit;
   /** How height above ground is shown. */
   height: 'ft' | 'm';
   weight_unit: 'kg' | 'lb';
+  wind_unit: import('./units').WindUnit;
   /** AGL bar ends and the green band, in feet. */
   agl: { bottom_m: number; top_m: number; low_m: number; high_m: number };
   ui: {

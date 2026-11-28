@@ -24,6 +24,7 @@ function windowIcon(): string | undefined {
 }
 
 const cli = parseCli(process.argv.slice(1));
+let launchUnits = { ...cli.displayUnits };
 const APP_NAME = 'Flap Happy';
 
 // Profile library lives in %APPDATA%/FlapHappy (profiles/*.json + settings.json).
@@ -327,13 +328,15 @@ if (!haveLock || cli.quit) {
     const requested = parseCli(argv);
     if (requested.quit) { app.quit(); return; }
     if (quitting) return;
+    launchUnits = { ...launchUnits, ...requested.displayUnits };
+    panelRuntime?.setLaunchUnits(requested.displayUnits);
     void showDesktop().catch(e => console.error('Could not open Flap Happy', e));
   });
   app.whenReady().then(async () => {
     store = new FileProfileStore(app.getPath('userData'));
     await store.getSettings();
     registerIpc();
-    panelRuntime = new PanelRuntime(store, (name) => source?.setLvarName?.(name), (session) => send('panel:session', session));
+    panelRuntime = new PanelRuntime(store, (name) => source?.setLvarName?.(name), (session) => send('panel:session', session), launchUnits);
     await panelRuntime.initialize();
     try {
       await startPanelServer({

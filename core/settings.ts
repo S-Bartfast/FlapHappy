@@ -1,6 +1,6 @@
 import { normalizePanelDestination } from './panel-install';
 import { SETTINGS_SCHEMA, type Settings } from './types';
-import { defaultAglScale, feetToMetres, roundMetres, type SpeedUnit } from './units';
+import { defaultAglScale, feetToMetres, roundMetres, speedUnit, windUnit, type SpeedUnit } from './units';
 import { clamp01 } from './profile';
 
 export function defaultSettings(): Settings {
@@ -11,6 +11,7 @@ export function defaultSettings(): Settings {
     ballast_by_profile: {},
     units: 'kt',
     weight_unit: 'kg',
+    wind_unit: 'auto',
     height: 'ft',
     agl: defaultAglScale(),
     ui: { compact: true, always_on_top: false, opacity: 1, zoom: 1, demo_mode: false, external_panel_on_launch: false, show_ballast: true, show_agl: true, simple_flap: false, group_hidden_flap_labels: false, auto_hide_external: false, show_transitions: false, show_wind: true, bar_shading: true },
@@ -44,7 +45,7 @@ export function normalizeSettings(raw: unknown): Settings {
   };
   const num = (x: unknown, def: number, lo: number, hi: number) =>
     typeof x === 'number' && isFinite(x) ? Math.max(lo, Math.min(hi, x)) : def;
-  const units: SpeedUnit = r.units === 'kmh' ? 'kmh' : 'kt';
+  const units: SpeedUnit = speedUnit(r.units);
   const height = r.height === 'm' || r.height === 'ft' ? r.height : units === 'kmh' ? 'm' : 'ft';
   const aglIn = obj(r.agl);
   const aglM = (m: unknown, ft: unknown, def: number) => {
@@ -58,6 +59,7 @@ export function normalizeSettings(raw: unknown): Settings {
     ballast_by_profile: ballast,
     units,
     weight_unit: r.weight_unit === 'lb' ? 'lb' : 'kg',
+    wind_unit: windUnit(r.wind_unit),
     height,
     agl: {
       bottom_m: aglM(aglIn.bottom_m, aglIn.bottom_ft, d.agl.bottom_m),
