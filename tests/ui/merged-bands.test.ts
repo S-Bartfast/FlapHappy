@@ -28,6 +28,18 @@ it('same merged groups and exact handle in desktop and cockpit',async()=>{
    expect(await page.locator(prefix+'.fh-ticktext').count()).toBe(6);
  }
  await d.click('.fh-cog');
- expect(await d.locator('.fh-exclude-transition input').first().isChecked()).toBe(true);
+ const hidden=d.locator('.fh-trow').first();
+ expect(await hidden.getByRole('switch',{name:'Show divider Transition L -> 6'}).isChecked()).toBe(false);
+ expect(await hidden.locator('.fh-speed:visible').count()).toBe(0);
+ expect(await hidden.getAttribute('class')).toContain('fh-transition-hidden');
+ const visible=d.locator('.fh-trow').nth(2);
+ expect(await visible.getByRole('switch').isChecked()).toBe(true);
+ expect(await visible.locator('.fh-speed:visible').count()).toBe(2);
+ for (const width of [820,580,360]) {
+   await d.setViewportSize({width,height:900});
+   const row=await visible.boundingBox();
+   expect(row!.x).toBeGreaterThanOrEqual(0);
+   expect(row!.x+row!.width).toBeLessThanOrEqual(width+1);
+ }
  await d.close();await c.close();
 });

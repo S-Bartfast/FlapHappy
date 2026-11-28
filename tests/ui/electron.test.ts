@@ -5,7 +5,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { SHOT_DIR } from './browser-env';
 import { makeProfile, sample } from '../unit/helpers';
-import { exportProfileJson, createBlankProfile } from '../../core/profile';
+import { exportProfileJson, createBlankProfile, parseProfileJson } from '../../core/profile';
 import { installCockpitPanel } from '../../app-electron/panel-install';
 
 const root = path.resolve(__dirname, '../..');
@@ -220,6 +220,64 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       expect((await getFeed()).groupHiddenFlapLabels).toBe(true);
       await page.click('.fh-main-settings');expect(await page.locator('.fh-group-hidden-labels').isChecked()).toBe(true);
     }finally{await browser?.close();await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
+  });
+
+  it('edits inline divider switches, retains hidden values and reloads saved/null transitions', async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'fh-divider-switch-'));
+    const fixture=makeProfile(4,{id:'divider-fixture'});
+    fixture.transitions[1]={no_ballast_kt:null,max_ballast_kt:null,exclude_from_display:true};
+    const profileFile=path.join(ud,'profiles',fixture.id+'.json');
+    fs.mkdirSync(path.dirname(profileFile));fs.writeFileSync(profileFile,exportProfileJson(fixture));
+    fs.writeFileSync(path.join(ud,'settings.json'),JSON.stringify({schema:'flaphappy.settings/1',last_profile_id:fixture.id,active_by_title:{'Simulated glider':fixture.id}}));
+    let session=await launch(ud);
+    try{
+      let {app,page}=session;
+      await page.click('.fh-main-settings');
+      const first=()=>page.locator('.fh-trow').nth(0), second=()=>page.locator('.fh-trow').nth(1);
+      const light=()=>first().locator('[data-path="transitions[0].no_ballast_kt"]'), heavy=()=>first().locator('[data-path="transitions[0].max_ballast_kt"]');
+      await first().getByRole('switch',{name:'Show divider Transition 1 -> 2'}).waitFor();
+      expect(await first().getByRole('switch').isChecked()).toBe(true);expect(await second().getByRole('switch').isChecked()).toBe(false);
+      expect(await page.locator('.fh-group-hidden-labels').isChecked()).toBe(false);
+      await light().fill('54');await heavy().fill('68');
+      const toggle=first().getByRole('switch');await toggle.focus();await toggle.press('Space');
+      expect(await toggle.isChecked()).toBe(false);expect(await light().isVisible()).toBe(false);expect(await heavy().isDisabled()).toBe(true);
+      expect(await toggle.evaluate(el=>document.activeElement===el)).toBe(true);
+      await toggle.press('Tab');expect(await page.evaluate(()=>document.activeElement?.getAttribute('data-path'))).toBe('flaps[1].label');
+      await first().locator('.fh-transition-toggle').click();
+      expect(await light().inputValue()).toBe('54');expect(await heavy().inputValue()).toBe('68');
+      expect(await light().isEnabled()).toBe(true);
+      await second().locator('.fh-transition-toggle').click();
+      expect(await second().locator('.fh-speed:visible').count()).toBe(2);
+      expect(await second().locator('.fh-speed').first().inputValue()).toBe('');
+      expect(await page.locator('.fh-validhead.err').textContent()).toContain('Not applied');
+      await second().locator('.fh-transition-toggle').click();
+      expect(await page.locator('.fh-validhead.err').count()).toBe(0);
+      await first().locator('.fh-transition-toggle').click();
+      expect((await getFeed()).profile.transitions[0].exclude_from_display).not.toBe(true);
+      await page.click('.fh-settings .fh-save');await page.waitForFunction(()=>document.querySelector('.fh-savestate')?.textContent==='Saved and applied');
+      const saved=parseProfileJson(fs.readFileSync(profileFile,'utf8')).profile!;
+      expect(saved.transitions[0].exclude_from_display).toBe(true);expect(saved.transitions[0].no_ballast_kt).toBeCloseTo(54,6);expect(saved.transitions[0].max_ballast_kt).toBeCloseTo(68,6);
+      expect(saved.transitions[1]).toEqual({no_ballast_kt:null,max_ballast_kt:null,exclude_from_display:true});
+      expect(saved.flaps).toEqual(fixture.flaps);expect(saved.transitions[2]).toEqual(fixture.transitions[2]);
+      expect((await getFeed()).profile.transitions[0].exclude_from_display).toBe(true);
+      expect((await getFeed()).groupHiddenFlapLabels).toBe(false);
+      const external=await openExternal(app,page);
+      await page.evaluate(()=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,{totalWeightKg:400,flapCount:4,flapIndex:1,iasKt:70});sim.tick(0);});
+      await external.waitForFunction(()=>document.querySelector('.fh-cell.current')?.textContent==='3'&&document.querySelector('.fh-badge')?.textContent==='2');
+      expect(await external.locator('.fh-cell').allTextContents()).toEqual(['3','4']);
+      await app.close();session=await launch(ud);({app,page}=session);
+      await page.click('.fh-main-settings');await first().getByRole('switch').waitFor();
+      expect(await first().getByRole('switch').isChecked()).toBe(false);expect(await first().locator('.fh-speed:visible').count()).toBe(0);
+      await first().locator('.fh-transition-toggle').click();
+      expect(await light().inputValue()).toBe('54');expect(await heavy().inputValue()).toBe('68');
+      expect(await second().getByRole('switch').isChecked()).toBe(false);
+      await second().locator('.fh-transition-toggle').click();
+      expect(await second().locator('.fh-speed').first().inputValue()).toBe('');
+      await page.click('.fh-settings .fh-save');await page.waitForFunction(()=>document.querySelector('.fh-savestate')?.textContent?.startsWith('Saved as incomplete'));
+      const incomplete=parseProfileJson(fs.readFileSync(profileFile,'utf8')).profile!;
+      expect(incomplete.transitions[1].exclude_from_display).not.toBe(true);expect(incomplete.transitions[1].no_ballast_kt).toBeNull();
+      expect((await getFeed()).profile.transitions[1].exclude_from_display).toBe(true);
+    }finally{await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
   });
 
   it('starts visibly with no ribbon, opens/closes/reopens the common panel and keeps feeding while minimized', async () => {

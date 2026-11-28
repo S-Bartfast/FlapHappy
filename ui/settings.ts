@@ -346,11 +346,31 @@ export class SettingsView {
         this.transNames.push(nameEl);
         const trow = speedRow('T' + (i + 1), 'fh-trow', nameEl, () => d.transitions[i], `transitions[${i}]`, false);
         if (this.prefilled.indexOf(i) >= 0) trow.classList.add('prefilled');
-        const excluded=h('input',{type:'checkbox',checked:d.transitions[i].exclude_from_display===true,'aria-label':'Exclude '+transitionName(d,i)+' from display',onchange:(e:Event)=>{
-          d.transitions[i].exclude_from_display=(e.target as HTMLInputElement).checked;
-          this.edited(false);
-        }});
-        this.table.appendChild(h('div', { class: 'fh-twrap' }, trow,h('label',{class:'fh-check fh-exclude-transition'},excluded,' Merge adjoining flap bands (exclude divider)')));
+        // Keep the field nodes and draft values intact while a divider is hidden.
+        const speedFields = Array.from(trow.children).slice(1) as HTMLElement[];
+        const paint = (shown: boolean) => {
+          toggleClass(trow, 'fh-transition-hidden', !shown);
+          for (const field of speedFields) {
+            field.hidden = !shown;
+            if (field instanceof HTMLInputElement) field.disabled = !shown;
+          }
+        };
+        nameEl.id = `fh-transition-name-${i}`;
+        const labelId = `fh-transition-show-${i}`;
+        const shown = d.transitions[i].exclude_from_display !== true;
+        const check = h('input', { type: 'checkbox', role: 'switch', class: 'fh-show-divider', checked: shown,
+          'aria-labelledby': labelId + ' ' + nameEl.id, onchange: (e: Event) => {
+            const on = (e.target as HTMLInputElement).checked;
+            d.transitions[i].exclude_from_display = !on;
+            paint(on);
+            this.edited(false);
+          } });
+        const control = h('label', { class: 'fh-transition-toggle', title: 'Turn off to merge adjacent flap bands without deleting transition speeds' },
+          h('span', { id: labelId }, 'Show divider'),
+          h('span', { class: 'fh-slide' }, check, h('span', { class: 'fh-slidetrack', 'aria-hidden': 'true' }, h('span', { class: 'fh-slideknob' }))));
+        trow.insertBefore(control, speedFields[0]);
+        paint(shown);
+        this.table.appendChild(h('div', { class: 'fh-twrap' }, trow));
       }
     });
     if (n > 0) {
