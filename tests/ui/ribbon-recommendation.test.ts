@@ -2,14 +2,16 @@ import { afterAll,beforeAll,expect,it } from 'vitest';
 import {startEnv,type Env} from './browser-env';
 import {makeProfile,sample} from '../unit/helpers';
 import {defaultSettings} from '../../core/settings';
+import {handleIndexOf} from '../../core/profile';
 let env:Env;beforeAll(async()=>{env=await startEnv();});afterAll(async()=>{expect(env.errors).toEqual([]);await env.close();});
 
 it('keeps actual blue, optionally highlights different suggestion and clears on ground in both renderers',async()=>{
- const p=makeProfile(6);let show=false,ias=95,ground=false;
+ const p=makeProfile(6);const currentHandle=handleIndexOf(p,2); // Physical flap 3, fastest-first native index 3.
+ expect(currentHandle).toBe(3);let show=false,ias=95,ground=false;
  const d=await env.newPage('?seed=demo',{width:820,height:900});
- await d.evaluate(p=>{const w=(window as any).__flapHappy;w.app.setActiveProfile(p,true);w.app.setBallast(0);Object.assign(w.sim.controls,{totalWeightKg:400,flapCount:6,flapIndex:2,iasKt:95,onGround:false,connected:true,inFlight:true});w.sim.tick(0);},p);
+ await d.evaluate(({profile,handle})=>{const w=(window as any).__flapHappy;w.app.setActiveProfile(profile,true);w.app.setBallast(0);Object.assign(w.sim.controls,{totalWeightKg:400,flapCount:6,flapIndex:handle,iasKt:95,onGround:false,connected:true,inFlight:true});w.sim.tick(0);},{profile:p,handle:currentHandle});
  const c=await env.browser.newPage({viewport:{width:350,height:500}});
- await c.route('**/api/state',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ready:true,profile:p,sample:sample({totalWeightKg:400,flapCount:6,flapIndex:2,iasKt:ias,onGround:ground}),receivedAt:Date.now(),ballast:0,units:'kt',height:'ft',agl:defaultSettings().agl,zoom:1,highlightRecommended:show})}));
+ await c.route('**/api/state',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ready:true,profile:p,sample:sample({totalWeightKg:400,flapCount:6,flapIndex:currentHandle,iasKt:ias,onGround:ground}),receivedAt:Date.now(),ballast:0,units:'kt',height:'ft',agl:defaultSettings().agl,zoom:1,highlightRecommended:show})}));
  await c.goto(env.url+'panel.html');await c.waitForSelector('.fh-cell.current');
  expect(await d.locator('.fh-display .fh-cell.recommended').count()).toBe(0);expect(await c.locator('.fh-cell.recommended').count()).toBe(0);
  await d.click('.fh-cog');await d.locator('.fh-highlight-recommended').evaluate((e:HTMLInputElement)=>e.click());await d.click('.fh-back');show=true;
