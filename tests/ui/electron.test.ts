@@ -280,6 +280,52 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
     }finally{await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
   });
 
+  it('forwards highlight preference from the main Settings session to both live panels and restart', async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-highlight-session-'));
+    const fixture=makeProfile(3,{id:'highlight-fixture'});
+    fixture.flaps.unshift({label:'L'});
+    fixture.transitions.unshift({no_ballast_kt:null,max_ballast_kt:null,exclude_from_display:true});
+    fixture.handle_count=4;
+
+    fs.mkdirSync(path.join(ud,'profiles'));fs.writeFileSync(path.join(ud,'profiles',fixture.id+'.json'),exportProfileJson(fixture));
+    fs.writeFileSync(path.join(ud,'settings.json'),JSON.stringify({schema:'flaphappy.settings/1',last_profile_id:fixture.id,active_by_title:{'Simulated glider':fixture.id}}));
+    let session=await launch(ud);let browser:import('playwright-core').Browser|undefined;
+    try{
+      let {app,page}=session;
+      let external=await openExternal(app,page);
+      const {chromium}=await import('playwright-core');const {chromePath}=await import('./browser-env');
+      browser=await chromium.launch({executablePath:chromePath(),args:['--no-sandbox']});const cockpit=await browser.newPage();await cockpit.goto(panelUrl+'/panel.html');
+      const sim=async(patch:Record<string,unknown>)=>page.evaluate(value=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,value);sim.tick(0);},patch);
+      await sim({flapCount:4,flapIndex:1,totalWeightKg:400,iasKt:55});
+      const hosts=[external,cockpit];
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-cell.current')!==null);
+      expect((await getFeed()).highlightRecommended).toBe(false);
+      await page.click('.fh-main-settings');await page.waitForSelector('.fh-highlight-recommended');
+
+      await page.locator('.fh-highlight-recommended').locator('..').click();
+
+      await waitUntil(async()=> (await getFeed()).highlightRecommended===true,'highlight preference');
+      for(const host of hosts){
+        await host.waitForFunction(()=>document.querySelector('.fh-readout')?.textContent==='55 kt'&&document.querySelectorAll('.fh-cell.recommended').length===0);
+        await host.waitForTimeout(1000);
+        await host.evaluate(()=>{const frames:any[]=[];(window as any).__frames=frames;new MutationObserver(()=>frames.push({ias:document.querySelector('.fh-readout')?.textContent,recommended:document.querySelector('.fh-cell.recommended')?.textContent,marker:parseFloat((document.querySelector('.fh-marker') as HTMLElement).style.left)})).observe(document.getElementById('app')!,{subtree:true,attributes:true,childList:true,characterData:true});});
+      }
+      await sim({iasKt:75});
+      for(const host of hosts){await host.waitForFunction(()=>document.querySelector('.fh-cell.recommended')?.textContent==='3');
+        const frames=await host.evaluate(()=>(window as any).__frames as {ias:string,recommended:string,marker:number}[]);
+        expect(frames.some(f=>f.ias==='75 kt'&&f.recommended==='3'&&f.marker<100*(64-40)/(98-40))).toBe(true);
+        expect(await host.locator('.fh-cell.current').textContent()).toBe('2');
+      }
+      await sim({iasKt:0});for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-cell.recommended')?.textContent==='1');
+      await page.locator('.fh-group-hidden-labels').locator('..').click();
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-cell.recommended')?.textContent==='L-1'&&document.querySelector('.fh-cell.current')?.textContent==='2');
+      await page.click('.fh-main-settings');
+      await app.close();session=await launch(ud);({app,page}=session);
+      expect((await getFeed()).highlightRecommended).toBe(true);
+      await page.click('.fh-main-settings');expect(await page.locator('.fh-highlight-recommended').isChecked()).toBe(true);
+    }finally{await browser?.close();await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
+  });
+
   it('starts visibly with no ribbon, opens/closes/reopens the common panel and keeps feeding while minimized', async () => {
     const ud = fs.mkdtempSync(path.join(os.tmpdir(), 'flaphappy-main-window-'));
     const fixture = makeProfile(2, { id: 'panel-fixture' });

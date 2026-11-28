@@ -60,6 +60,7 @@ export interface DisplayModel {
   currentRow: number | null;
   /** Simple guidance uses the same ordered profile buckets as the IAS marker. */
   simple: { current: string | null; suggestion: { label: string; direction: 'slower' | 'faster' } | null };
+  recommendedRow:number|null;
 }
 
 export interface ModelInput {
@@ -123,6 +124,7 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
     incompleteMessage: null,
     currentRow: null,
     simple: { current: null, suggestion: null },
+    recommendedRow:null,
   };
   if (!profile || !validation) {
     base.incompleteMessage = 'no profile: open settings';
@@ -191,6 +193,7 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
       // A visual IAS lower bound is not a recommendation cutoff.
         const row = recommendationIas < boundaries[0] ? 0 : bucketIndex(recommendationIas, boundaries);
       if (base.currentRow !== null && row >= 0 && row < base.cells.length && row !== base.currentRow) {
+        base.recommendedRow = row;
         base.simple.suggestion = { label: base.cells[row].label, direction: row < base.currentRow ? 'slower' : 'faster' };
       }
     }

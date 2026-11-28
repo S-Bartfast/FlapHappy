@@ -32,6 +32,7 @@ export interface CockpitState {
   autoHideExternal?:boolean;
   groupHiddenFlapLabels?: boolean;
   showTransitions: boolean;
+  highlightRecommended?:boolean;
   showWind: boolean;
   /** Cylinder shading on the IAS and AGL fills. Missing means on. */
   barShading: boolean;

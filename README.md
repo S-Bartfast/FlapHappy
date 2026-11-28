@@ -182,3 +182,6 @@ When **Flap transitions** is enabled, the whole-number speed labels occupy a sin
 ### Optional stall IAS
 
 Existing stall IAS remains authoritative when supplied. Leave both stall inputs blank to use an inferred display-only lower edge: one median gap below the first shown transition, clamped at zero, or zero with fewer than two shown transitions. This edge is not a stall speed and does not generate a LOW warning. Existing native Vne and profile file formats are unchanged.
+
+### Recommendation highlight
+Enable **Highlight suggested flap** in Settings to highlight the different flap band suggested by the current IAS in the full ribbon (light amber). The actual handle stays blue. It defaults off, and no highlight is shown on the ground, when the live handle/IAS or valid speeds are unavailable, above the applicable IAS range, or when the suggestion matches the actual band. Valid in-flight IAS below the lower edge, including zero, retains the slowest-band highlight independently of the existing 25 kt visual greying threshold.
