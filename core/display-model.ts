@@ -1,7 +1,7 @@
 import type { Profile, ValidationResult } from './types';
 import type { SimSample } from './sim';
 import type { CurrentFlap } from './flapmap';
-import { bucketIndex, columnEdges, effectiveBoundaries, mapMarker, type MarkerRegion } from './scale';
+import { bucketIndex, columnEdges, effectiveBoundaries, flapGroups, mapMarker, type MarkerRegion } from './scale';
 import { interpolationFraction, liveWeight, type WeightState } from './weight';
 import { aglMarkLabels, aglMarkPositions, defaultAglScale, formatAgl, formatIas, formatTick, type AglScale, type HeightUnit, type SpeedUnit } from './units';
 
@@ -23,7 +23,7 @@ export interface CellModel {
 }
 
 export interface FlapBadge {
-  kind: 'unknown' | 'other' | 'manual';
+  kind: 'unknown' | 'other' | 'manual' | 'mapped';
   text: string;
 }
 
@@ -76,6 +76,8 @@ export interface ModelInput {
   flap: CurrentFlap;
   /** Display unit. The profile's working speeds are knots. */
   units?: SpeedUnit;
+  /** Merge label text only; physical groups and trigger geometry always stay intact. */
+  groupHiddenFlapLabels?: boolean;
   /** Height unit for the AGL bar. */
   height?: HeightUnit;
   /** AGL bar ends and the green band, in feet. */
@@ -149,16 +151,17 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
   if (base.mode === 'incomplete') base.incompleteMessage = 'profile incomplete: open settings';
   else if (weight.anchorsValid && weight.kg === null) base.incompleteMessage = 'Flying weight unavailable';
 
-  // Flap cells: one per row.
+  // Exclusion merges neighboring cells but never changes the native handle.
+  const groups=flapGroups(profile);
   if (n > 0 && validation.structureOk) {
     const current = live || link === 'paused' || link === 'nodata' ? flap.rowIndex : null;
-    base.currentRow = link === 'waiting' ? null : current;
-    base.cells = profile.flaps.map((row, i) => ({
-      label: row.label,
-      state: base.currentRow === i ? 'current' : 'other',
-    }));
+    const group=current===null?-1:groups.members.findIndex(m=>m.includes(current));
+    base.currentRow=group<0?null:group;
+    base.cells=groups.labels.map((label,i)=>({label:inp.groupHiddenFlapLabels===true?label:profile.flaps[groups.members[i][groups.members[i].length-1]].label,state:base.currentRow===i?'current':'other'}));
+    if(base.currentRow!==null&&groups.members[base.currentRow].length>1&&flap.label)
+      base.badge={kind:'mapped',text:flap.label};
   } else if (n > 0) {
-    base.cells = profile.flaps.map((row) => ({ label: row.label, state: 'other' as const }));
+    base.cells=groups.labels.map((label,i)=>({label:inp.groupHiddenFlapLabels===true?label:profile.flaps[groups.members[i][groups.members[i].length-1]].label,state:'other'}));
   }
 
   if (link !== 'waiting') {
@@ -184,8 +187,8 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
         recommendationIas !== null && isFinite(recommendationIas) && recommendationIas >= 0) {
       // A visual IAS lower bound is not a recommendation cutoff.
         const row = recommendationIas < boundaries[0] ? 0 : bucketIndex(recommendationIas, boundaries);
-      if (row >= 0 && row < n && row !== mappedRow) {
-        base.simple.suggestion = { label: profile.flaps[row].label, direction: row < mappedRow ? 'slower' : 'faster' };
+      if (base.currentRow !== null && row >= 0 && row < base.cells.length && row !== base.currentRow) {
+        base.simple.suggestion = { label: base.cells[row].label, direction: row < base.currentRow ? 'slower' : 'faster' };
       }
     }
     if (hasIas) {

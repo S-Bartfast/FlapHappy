@@ -520,6 +520,12 @@ export class App {
     this.renderAll();
   }
 
+  setGroupHiddenFlapLabels(on: boolean): void {
+    this.settings.ui.group_hidden_flap_labels = on;
+    this.persistSoon();
+    this.renderAll();
+  }
+
   setSimpleFlap(on: boolean): void {
     this.settings.ui.simple_flap = on;
     this.persistSoon();
@@ -637,6 +643,7 @@ export class App {
       units: this.settings.units,
       height: this.settings.height,
       agl: this.settings.agl,
+      groupHiddenFlapLabels: this.settings.ui.group_hidden_flap_labels,
     });
   }
 
