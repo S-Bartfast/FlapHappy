@@ -98,6 +98,47 @@ export function nativeWidth(n: number): number {
   return Math.max(560, n * 64 + GUTTERS);
 }
 
+/** Averaging window for the AGL readout and bar: the sim refreshes the ground height in steps a few times a second. */
+export const AGL_AVERAGE_MS = 1000;
+
+/** Time-weighted mean over the last windowMs, where each reading holds until the next one arrives. */
+export class RollingAverage {
+  private points: Array<{ t: number; v: number }> = [];
+
+  constructor(private readonly windowMs: number) {}
+
+  reset(): void {
+    this.points = [];
+  }
+
+  add(t: number, v: number): void {
+    const last = this.points[this.points.length - 1];
+    if (last && t <= last.t) {
+      if (t === last.t) last.v = v;
+      return;
+    }
+    this.points.push({ t, v });
+  }
+
+  value(now: number): number | null {
+    const start = now - this.windowMs;
+    while (this.points.length > 1 && this.points[1].t <= start) this.points.shift();
+    const n = this.points.length;
+    if (n === 0) return null;
+    let sum = 0;
+    let span = 0;
+    for (let i = 0; i < n; i++) {
+      const from = Math.max(this.points[i].t, start);
+      const to = i + 1 < n ? Math.min(this.points[i + 1].t, now) : now;
+      if (to > from) {
+        sum += this.points[i].v * (to - from);
+        span += to - from;
+      }
+    }
+    return span > 0 ? sum / span : this.points[n - 1].v;
+  }
+}
+
 /** Exponential smoothing step; tauMs <= 0 disables smoothing. */
 export function smoothStep(prev: number | null, next: number, dtMs: number, tauMs: number): number {
   if (prev === null || tauMs <= 0 || dtMs <= 0) return next;

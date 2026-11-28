@@ -156,21 +156,22 @@ describe('display model', () => {
     expect(m.marker.pos).toBeCloseTo((46 - 40) / (82 - 40), 8);
   });
 
-  it('shows raw height in the readout and the smoothed height drives the bar', () => {
+  it('the averaged height drives the readout and the smoothed height drives the bar', () => {
     const p = makeProfile(2);
-    const m = buildDisplayModel({
+    const input = {
       profile: p,
       validation: validateProfile(p),
       sample: sample({ aglFt: 600, flapCount: 2 }),
-      link: 'live',
+      link: 'live' as const,
       manualBallast: 0,
       ias: null,
-      aglFt: 200,
       flap: new CurrentFlapResolver().resolve(p, sample({ flapCount: 2 }), 1000),
-    });
-    expect(m.aglText).toBe('600 ft');
+    };
+    const m = buildDisplayModel({ ...input, aglFt: 200, aglReadFt: 450 });
+    expect(m.aglText).toBe('450 ft');
     expect(m.aglPos).toBe(0);
     expect(m.aglInBand).toBe(false);
+    expect(buildDisplayModel({ ...input, aglFt: 200 }).aglText).toBe('600 ft');
   });
 
   it('km/h converts the readout and the tick numbers from knots', () => {
