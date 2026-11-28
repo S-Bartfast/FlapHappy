@@ -57,6 +57,8 @@ export class App {
   private externalOpen = false;
   private displayView!: HTMLElement;
   private statusEl!: HTMLElement;
+  private mainAircraftEl?: HTMLElement;
+  private mainExternalState?: HTMLElement;
   private titleEl!: HTMLElement;
   private pinBtn: HTMLElement | null = null;
   private settingsView: SettingsView | null = null;
@@ -186,14 +188,20 @@ export class App {
       this.launchCheck = h('input', { class: 'fh-external-launch', type: 'checkbox', checked: this.settings.ui.external_panel_on_launch,
         onchange: (e: Event) => { this.settings.ui.external_panel_on_launch = (e.target as HTMLInputElement).checked; this.persistSoon(); } }) as HTMLInputElement;
       this.settingsBtn = h('button', { class: 'fh-btn fh-main-settings', type: 'button', 'aria-expanded': 'false', onclick: () => this.settingsOpen ? this.closeSettings() : this.openSettings() }, 'Settings and profiles') as HTMLButtonElement;
+      this.mainAircraftEl = h('div', { class: 'fh-main-value' }, 'Waiting for aircraft');
+      this.mainExternalState = h('div', { class: 'fh-main-value' }, 'Closed');
+      const card = (label: string, ...children: HTMLElement[]) => h('section', { class: 'fh-main-card', 'aria-label': label },
+        h('h2', null, label), ...children);
       const controls = h('div', { class: 'fh-main-controls' },
-        h('h1', null, 'Flap Happy'),
-        h('p', { class: 'fh-main-copy' }, 'The in-sim panel is available while Flap Happy runs. Open the external panel only when you want a desktop flight display.'),
-        h('div', { class: 'fh-main-actions' }, this.externalBtn,
-          this.settingsBtn),
-        h('label', { class: 'fh-check fh-main-launch' }, this.launchCheck, ' Open the external panel on launch'),
-        h('p', { class: 'fh-hint' }, this.deps.info.panelAvailable ? 'Install the in-sim panel from Settings > Window and app.' : 'Panel feed unavailable. Check that another instance is not using the cockpit port.'));
-      this.displayView = h('div', { class: 'fh-display fh-main-display' }, controls, header);
+        h('div', { class: 'fh-main-heading' }, h('h1', null, 'Flap Happy'), this.settingsBtn),
+        h('div', { class: 'fh-main-grid' },
+          card('Simulator connection', this.statusEl),
+          card('Detected aircraft', this.mainAircraftEl),
+          card('Active profile', this.titleEl, this.saveBtn),
+          card('External panel', this.mainExternalState, this.externalBtn,
+            h('label', { class: 'fh-check fh-main-launch' }, this.launchCheck, ' Open the external panel on launch'))),
+        h('p', { class: 'fh-hint' }, this.deps.info.panelAvailable ? 'Install the in-sim panel from Settings > Window and app. The feed remains available while Flap Happy runs.' : 'Panel feed unavailable. Check that another instance is not using the cockpit port.'));
+      this.displayView = h('div', { class: 'fh-display fh-main-display' }, controls);
       this.paintExternal();
     } else {
       this.displayView = h('div', { class: 'fh-display' }, header, this.strip!.el);
@@ -660,6 +668,8 @@ export class App {
     if (this.usingSim) bits.push('DEMO');
     if (model.mode === 'noflaps') bits.push('no flaps');
     setText(this.statusEl, bits.join('  |  '));
+    if (this.mainAircraftEl) setText(this.mainAircraftEl, model.link === 'live' ? (this.lastSample?.aircraftTitle || 'Aircraft title unavailable') : 'Waiting for aircraft');
+    if (this.mainAircraftEl && !this.profile) setText(this.titleEl, 'No active profile');
     toggleClass(this.statusEl, 'warn', model.link !== 'live');
     if (this.pinBtn) toggleClass(this.pinBtn, 'on', this.settings.ui.always_on_top);
     this.paintSaveButton();
@@ -670,6 +680,7 @@ export class App {
     if (!this.externalBtn) return;
     this.externalBtn.textContent = this.externalOpen ? 'Close external panel' : 'Show external panel';
     this.externalBtn.disabled = !this.deps.info.panelAvailable;
+    if (this.mainExternalState) setText(this.mainExternalState, !this.deps.info.panelAvailable ? 'Unavailable' : this.externalOpen ? 'Open' : 'Closed');
     this.externalBtn.setAttribute('aria-pressed', String(this.externalOpen));
   }
 

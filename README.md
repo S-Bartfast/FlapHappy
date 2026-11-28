@@ -22,7 +22,7 @@ With MSFS 2024: start the sim first or after, either works. Flap Happy reconnect
 ### Main window and optional external panel
 
 Start Flap Happy normally. The main control window always opens with its normal window
-controls and can be minimized or closed to exit. It contains **Settings and profiles**,
+controls and can be minimized or closed to exit. The main window identifies the simulator connection, detected aircraft, active profile and external panel state separately. It contains **Settings and profiles**,
 a **Show external panel / Close external panel** button, and a separate **Open the external
 panel on launch** checkbox (off by default). This checkbox is saved across restarts;
 manually opening or closing the ribbon does not change it.

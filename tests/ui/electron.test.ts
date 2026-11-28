@@ -819,3 +819,22 @@ it.skipIf(!canRun)('fits main window controls as the actual Windows client width
    expect(await page.evaluate(()=>{const e=document.querySelector('.fh-main-controls')!;return e.getBoundingClientRect().width>=document.documentElement.clientWidth-25;})).toBe(true);
  }}finally{await app.close();}
 });
+
+it.skipIf(!canRun)('shows live main status cards and keeps external and Settings controls independent',async()=>{
+  const ud=fs.mkdtempSync(path.join(os.tmpdir(),'fh-main-cards-'));const {app,page}=await launch(ud);
+  try {
+    await page.waitForFunction(()=>document.querySelector('[aria-label="Detected aircraft"] .fh-main-value')?.textContent==='Simulated glider');
+    expect(await page.locator('[aria-label="Simulator connection"] .fh-status').textContent()).toContain('DEMO');
+    expect(await page.locator('[aria-label="Active profile"] .fh-title').textContent()).not.toBe('No active profile');
+    const ext=page.locator('[aria-label="External panel"] .fh-main-value');
+    expect(await ext.textContent()).toBe('Closed');
+    await openExternal(app,page);expect(await ext.textContent()).toBe('Open');
+    await page.click('.fh-main-settings');expect(await page.locator('.fh-main-settings').textContent()).toBe('Close settings');
+    await page.click('.fh-main-settings');await closeExternal(app,page);expect(await ext.textContent()).toBe('Closed');
+    for(const width of [480,760,1200]){
+       await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setSize(width,560),width);
+       await page.waitForTimeout(150);
+       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    }
+  } finally {await app.close();}
+});
