@@ -34,6 +34,9 @@ Settings. Closing the main window exits the app and closes the external panel to
 A second launch (or `--show`) restores the existing main window; `--quit` exits the session.
 The previous experimental windowless launch flag is no longer a windowless mode.
 
+### Auto-hide in external views (optional)
+
+In Settings → Window and app, enable **Auto-hide from external views (in-sim panel only)**. It defaults off. Reinstall the cockpit panel from Settings to update an older installed wrapper. The panel stays loaded and becomes visible again in cockpit view. The desktop display is unaffected. The implementation recognizes the SDK's named chase, fixed, environment, showcase and drone states; ambiguous/unknown values remain visible. The [MSFS 2024 Camera Variables documentation](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simvars/camera-variables/) inconsistently describes value 9, so it is not used as proof of an external view. Live MSFS and VR validation is still needed.
 ### First use
 1. Click **Settings and profiles** in the main window. The same button becomes **Close settings**.
    Only one **Save** button is shown; closing the editor retains an unsaved profile draft for later saving.
@@ -157,10 +160,16 @@ Everything above runs and is tested without the sim. These need a real Windows m
 4. Sample rate and behaviour on pause, menus, loading and slew (the "Paused" / "No data" states).
 5. Always-on-top over MSFS in windowed, borderless and true fullscreen modes (the app uses the highest topmost level; exclusive fullscreen may still hide it).
 6. Packaging: the portable exe starts, SmartScreen behaviour, `%APPDATA%\FlapHappy` creation, file open/save dialogs, "Open profiles folder".
-7. Cockpit panel: Settings → Window and app → **Install cockpit panel**, then restart MSFS. In the cockpit (including VR) press Tab and open **Flap Happy**. The main application must be running; the external flight ribbon is optional.
+7. Cockpit panel: Settings → Window and app → **Enable in-sim panel**, then restart MSFS. In the cockpit (including VR) press Tab and open **Flap Happy**. The main application must be running; the external flight ribbon is optional.
 8. The `--record` trace from a real flight replays correctly with `--source=replay`.
 
 The visible main window and Settings controls adjust to the available width; narrower windows wrap controls instead of requiring horizontal scrolling.
+
+### In-sim panel installation management
+
+Settings → Window and app → In-sim panel: choose the detected MSFS 2024 Community folder or an existing custom add-ons library parent. Browse is available only for a custom destination. Selecting the detected Community folder directly normalizes to Default Community.
+
+Enable installs the verified bundled panel, disabling removes a verified physical install. An installed older package exposes Update and a Settings badge. Equal or newer versions are not overwritten. This is a bundled-version check, not a desktop release checker. Close MSFS before making changes. A custom package may be linked by MSFS Addons Linker; Flap Happy never creates or removes those links. Unlink before removing. Changing destination does not move the existing package; remove/unlink the old installation explicitly first. If a target is unfamiliar, damaged, duplicated or linked to another package, the app refuses to overwrite it. Updates stage on the destination volume outside Community and roll back on a failed swap.
 
 ### Optional stall IAS
 
