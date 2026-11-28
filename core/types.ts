@@ -109,6 +109,7 @@ export interface Settings {
     opacity: number;
     zoom: number;
     demo_mode: boolean;
+    external_panel_on_launch: boolean;
     /** The ballast slider on the display. */
     show_ballast: boolean;
     /** The height bar on the display. */
@@ -121,5 +122,7 @@ export interface Settings {
     /** Cylinder shading on the IAS and AGL fills, including the white end line. */
     bar_shading: boolean;
   };
+  /** Original ribbon bounds retained for the optional external panel. */
   window: WindowBounds | null;
+  main_window: WindowBounds | null;
 }
