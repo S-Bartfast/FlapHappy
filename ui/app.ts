@@ -7,7 +7,7 @@ import { buildDisplayModel, deriveLink, type DisplayModel } from '../core/displa
 import { canSaveWeightMode, interpolationFraction, liveWeight, profileForWeightMode, usesManualBallast, validWeightAnchors, weightModeForProfile, type WeightMode } from '../core/weight';
 import { initialBallast, type BallastState } from '../core/ballast';
 import { selectProfileId } from '../core/select';
-import { effectiveBoundaries, smoothStep } from '../core/scale';
+import { AGL_AVERAGE_MS, RollingAverage, effectiveBoundaries, smoothStep } from '../core/scale';
 import { clamp01, cloneProfile, exportProfileJson, parseProfileJson, profileLabel } from '../core/profile';
 import { defaultSettings } from '../core/settings';
 import { SimulatedSource } from '../adapters/simulated/simulated-source';
@@ -48,6 +48,8 @@ export class App {
   private resolver = new CurrentFlapResolver();
   private smoothIas: number | null = null;
   private smoothAgl: number | null = null;
+  private readonly aglAverage = new RollingAverage(AGL_AVERAGE_MS);
+  private avgAgl: number | null = null;
   private smoothAt = 0;
   private strip?: StripView;
   private slider?: WeightControl;
@@ -250,7 +252,8 @@ export class App {
     if (d.realSource) d.realSource.stop();
     this.resolver.reset();
     this.smoothIas = null;
-    this.smoothAgl = null;
+    this.smoothAgl = this.avgAgl = null;
+    this.aglAverage.reset();
     this.lastSample = null;
     if (d.info.mainWindow && d.realSource) {
       d.realSource.start((s) => this.onSample(s));
@@ -297,12 +300,19 @@ export class App {
       const tau = this.profile.marker_smoothing_ms;
       if (s.iasKt !== null) this.smoothIas = smoothStep(this.smoothIas, s.iasKt, dt, tau);
       else this.smoothIas = null;
-      if (s.aglFt !== null) this.smoothAgl = smoothStep(this.smoothAgl, s.aglFt, dt, tau);
-      else this.smoothAgl = null;
+      if (s.aglFt !== null && isFinite(s.aglFt)) {
+        this.aglAverage.add(now, s.aglFt);
+        this.avgAgl = this.aglAverage.value(now);
+        this.smoothAgl = this.avgAgl === null ? null : smoothStep(this.smoothAgl, this.avgAgl, dt, tau);
+      } else {
+        this.aglAverage.reset();
+        this.avgAgl = this.smoothAgl = null;
+      }
       this.smoothAt = now;
     } else {
       this.smoothIas = null;
-      this.smoothAgl = null;
+      this.smoothAgl = this.avgAgl = null;
+      this.aglAverage.reset();
     }
     this.renderAll();
   }
@@ -327,7 +337,8 @@ export class App {
     // Never dispose or replace a user's draft when the active aircraft changes.
     if (changed) {
       this.resolver.reset();
-      this.smoothIas = this.smoothAgl = null;
+      this.smoothIas = this.smoothAgl = this.avgAgl = null;
+      this.aglAverage.reset();
       this.smoothAt = 0;
       this.syncSimToProfile();
     }
@@ -639,6 +650,7 @@ export class App {
       manualBallast: this.ballast.f,
       ias: this.smoothIas,
       aglFt: this.smoothAgl,
+      aglReadFt: this.avgAgl,
       flap,
       units: this.settings.units,
       height: this.settings.height,
