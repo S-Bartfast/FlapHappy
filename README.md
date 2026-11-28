@@ -178,3 +178,7 @@ In Settings, each transition has a **Show divider** switch. On displays its Min 
 
 ### Responsive speed-trigger labels
 When **Flap transitions** is enabled, the whole-number speed labels occupy a single row where their measured text widths fit. Crowded labels alternate between two rows while remaining aligned with the real dividers. Extremely dense values remain available on the dividers rather than overlapping neighboring text. The IAS calculations and units are unchanged.
+
+### Optional stall IAS
+
+Existing stall IAS remains authoritative when supplied. Leave both stall inputs blank to use an inferred display-only lower edge: one median gap below the first shown transition, clamped at zero, or zero with fewer than two shown transitions. This edge is not a stall speed and does not generate a LOW warning. Existing native Vne and profile file formats are unchanged.

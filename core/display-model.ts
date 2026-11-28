@@ -202,7 +202,7 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
       } else {
         const m = mapMarker(ias, boundaries, base.edges);
         base.marker = { pos: m.pos, region: m.region, greyed: false };
-        base.alert = m.region === 'below' ? 'LOW' : m.region === 'above' ? 'FAST' : null;
+        base.alert = m.region === 'below' && profile.vs_min.no_ballast_kt!==null ? 'LOW' : m.region === 'above' ? 'FAST' : null;
       }
     }
   }
