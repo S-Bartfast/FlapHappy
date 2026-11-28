@@ -1,3 +1,4 @@
+import type { DisplayPreferences, DisplayUnitOverrides, SpeedUnit, WindUnit } from '../core/units';
 import type { DataSource, Host, HostInfo, ProfileStore, SimSample } from '../core/sim';
 import type { ActiveSession } from '../core/cockpit';
 import type { Profile, ProfileMeta, Settings, ValidationResult } from '../core/types';
@@ -34,6 +35,11 @@ const SAVE_DEBOUNCE_MS = 500;
 
 export class App {
   settings: Settings = defaultSettings();
+  launchUnits: DisplayUnitOverrides = {};
+  get displayUnits(): DisplayPreferences {
+    const { units, height, weight_unit, wind_unit } = this.settings;
+    return { units, height, weight_unit, wind_unit, ...this.launchUnits };
+  }
   metas: ProfileMeta[] = [];
   profile: Profile | null = null;
   validation: ValidationResult | null = null;
@@ -320,6 +326,11 @@ export class App {
   private receiveSession(session: ActiveSession | null): void {
     if (!session || session.revision < this.sessionRevision) return;
     this.sessionRevision = session.revision;
+    const inherited = session.launchUnits ?? {};
+    if (JSON.stringify(inherited) !== JSON.stringify(this.launchUnits)) {
+      this.launchUnits = { ...inherited };
+      this.settingsView?.launchUnitsChanged();
+    }
     this.sessionReady = session.ready;
     const changed = this.profile?.id !== session.profile?.id;
     this.profile = session.profile;
@@ -429,20 +440,30 @@ export class App {
     return s && s.connected && s.flapCount !== null && s.flapCount > 0 ? s.flapCount : null;
   }
 
-  setSpeedUnit(unit: 'kt' | 'kmh'): void {
+  setSpeedUnit(unit: SpeedUnit): void {
+    if (this.launchUnits.units !== undefined) return;
     this.settings.units = unit;
     this.persistSoon();
     this.renderAll();
   }
 
   setWeightUnit(unit: 'kg' | 'lb'): void {
+    if (this.launchUnits.weight_unit !== undefined) return;
     this.settings.weight_unit = unit;
     this.persistSoon();
     this.renderAll();
   }
 
   setHeightUnit(unit: 'ft' | 'm'): void {
+    if (this.launchUnits.height !== undefined) return;
     this.settings.height = unit;
+    this.persistSoon();
+    this.renderAll();
+  }
+
+  setWindUnit(unit: WindUnit): void {
+    if (this.launchUnits.wind_unit !== undefined) return;
+    this.settings.wind_unit = unit;
     this.persistSoon();
     this.renderAll();
   }
@@ -640,8 +661,9 @@ export class App {
       ias: this.smoothIas,
       aglFt: this.smoothAgl,
       flap,
-      units: this.settings.units,
-      height: this.settings.height,
+      units: this.displayUnits.units,
+      height: this.displayUnits.height,
+      windUnit: this.displayUnits.wind_unit,
       agl: this.settings.agl,
       groupHiddenFlapLabels: this.settings.ui.group_hidden_flap_labels,
     });
@@ -651,7 +673,7 @@ export class App {
     if (!this.displayView) return;
     const model = this.buildModelFor(this.profile, this.validation);
     this.lastModel = model;
-    this.slider?.render(this.profile, model.weight, this.ballast, this.settings.weight_unit);
+    this.slider?.render(this.profile, model.weight, this.ballast, this.displayUnits.weight_unit);
     this.strip?.render(model, { profile: this.profile, zoom: this.settings.ui.zoom, showBallast: this.settings.ui.show_ballast, showAgl: this.settings.ui.show_agl, simpleFlap: this.settings.ui.simple_flap, showTransitions: this.settings.ui.show_transitions, showWind: this.settings.ui.show_wind, barShading: this.settings.ui.bar_shading });
     setText(this.titleEl, this.profile ? profileLabel(this.profile.id) : 'Flap Happy');
     const bits: string[] = [];

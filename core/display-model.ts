@@ -3,7 +3,7 @@ import type { SimSample } from './sim';
 import type { CurrentFlap } from './flapmap';
 import { bucketIndex, columnEdges, effectiveBoundaries, flapGroups, mapMarker, type MarkerRegion } from './scale';
 import { interpolationFraction, liveWeight, type WeightState } from './weight';
-import { aglMarkLabels, aglMarkPositions, defaultAglScale, formatAgl, formatIas, formatTick, type AglScale, type HeightUnit, type SpeedUnit } from './units';
+import { aglMarkLabels, aglMarkPositions, defaultAglScale, formatAgl, formatIas, formatTick, formatWind, speedUnit, windUnit, type AglScale, type HeightUnit, type SpeedUnit } from './units';
 
 export type LinkState = 'waiting' | 'nodata' | 'paused' | 'live';
 
@@ -76,6 +76,7 @@ export interface ModelInput {
   flap: CurrentFlap;
   /** Display unit. The profile's working speeds are knots. */
   units?: SpeedUnit;
+  windUnit?: import('./units').WindUnit;
   /** Merge label text only; physical groups and trigger geometry always stay intact. */
   groupHiddenFlapLabels?: boolean;
   /** Height unit for the AGL bar. */
@@ -94,7 +95,8 @@ const STATUS: Record<LinkState, string | null> = {
 export function buildDisplayModel(inp: ModelInput): DisplayModel {
   const { profile, validation, sample, link, flap } = inp;
   const weight = liveWeight(profile, sample, link === 'live');
-  const units = inp.units === 'kmh' ? 'kmh' : 'kt';
+  const units = speedUnit(inp.units);
+  const wind = windUnit(inp.windUnit);
   const height: HeightUnit = inp.height === 'm' ? 'm' : 'ft';
   const aglScale = inp.agl ?? defaultAglScale();
   const base: DisplayModel = {
@@ -114,7 +116,7 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
     aglInBand: false,
     aglMarks: aglMarkLabels(height, aglScale),
     aglMarkPos: aglMarkPositions(aglScale),
-    windText: formatIas(null, units),
+    windText: formatWind(null, wind, units),
     marker: { pos: null, region: null, greyed: false },
     alert: null,
     badge: null,
@@ -141,7 +143,7 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
     base.aglInBand = bar.inBand;
   }
   if (live && sample && sample.windKt !== null && isFinite(sample.windKt)) {
-    base.windText = formatIas(Math.max(0, sample.windKt), units);
+    base.windText = formatWind(Math.max(0, sample.windKt), wind, units);
   }
 
   const n = profile.flaps.length;

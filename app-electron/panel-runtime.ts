@@ -1,3 +1,4 @@
+import type { DisplayUnitOverrides } from '../core/units';
 import { defaultSettings, normalizeSettings } from '../core/settings';
 import type { ActiveSession, CockpitState } from '../core/cockpit';
 import type { ProfileStore, SimSample } from '../core/sim';
@@ -25,12 +26,13 @@ export class PanelRuntime {
     private store: ProfileStore,
     private setLvar: (name: string | null) => void,
     private notifySession: (session: ActiveSession) => void,
+    private launchUnits: DisplayUnitOverrides = {},
   ) {}
 
   getState = (): CockpitState => this.state;
 
   getSession = (): ActiveSession => ({
-    revision: this.sessionRevision, ready: this.state.ready, profile: this.state.profile, ballast: this.state.ballast,
+    revision: this.sessionRevision, launchUnits: { ...this.launchUnits }, ready: this.state.ready, profile: this.state.profile, ballast: this.state.ballast,
   });
 
   private publishSession(): void {
@@ -99,9 +101,16 @@ export class PanelRuntime {
     }
   }
 
+  setLaunchUnits(units: DisplayUnitOverrides): void {
+    if (!Object.keys(units).length) return;
+    this.launchUnits = { ...this.launchUnits, ...units };
+    this.applyDisplayPreferences();
+    this.publishSession();
+  }
+
   private applyDisplayPreferences(): void {
-    const s = this.preferences;
-    this.state = { ...this.state, units: s.units, weightUnit: s.weight_unit, height: s.height, agl: s.agl, zoom: s.ui.zoom,
+    const s = { ...this.preferences, ...this.launchUnits };
+    this.state = { ...this.state, units: s.units, weightUnit: s.weight_unit, height: s.height, windUnit: s.wind_unit, agl: s.agl, zoom: s.ui.zoom,
       showBallast: s.ui.show_ballast, showAgl: s.ui.show_agl, simpleFlap: s.ui.simple_flap, groupHiddenFlapLabels: s.ui.group_hidden_flap_labels, autoHideExternal: s.ui.auto_hide_external, showTransitions: s.ui.show_transitions,
       showWind: s.ui.show_wind, barShading: s.ui.bar_shading };
   }
@@ -111,7 +120,7 @@ export class PanelRuntime {
     // Settings requests from the renderer are display-only. Selection is
     // an explicit command, never an older renderer snapshot.
     const settings = normalizeSettings({
-      ...previous, units: incoming.units, height: incoming.height, weight_unit: incoming.weight_unit, agl: incoming.agl, ui: incoming.ui,
+      ...previous, units: incoming.units, height: incoming.height, weight_unit: incoming.weight_unit, wind_unit: incoming.wind_unit, agl: incoming.agl, ui: incoming.ui,
       panel_destination: incoming.panel_destination,
     });
     settings.ballast_by_profile = previous.ballast_by_profile;

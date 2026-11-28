@@ -5,7 +5,7 @@ import { validateProfile } from '../core/validate';
 import { CurrentFlapResolver } from '../core/flapmap';
 import { buildDisplayModel, deriveLink } from '../core/display-model';
 import { smoothStep } from '../core/scale';
-import type { AglScale } from '../core/units';
+import { speedUnit, windUnit, type AglScale } from '../core/units';
 import { h, setText } from './dom';
 import { StripView } from './strip';
 import { WeightControl } from './slider';
@@ -109,7 +109,8 @@ function paint(state: CockpitState): void {
     ias: smoothIas,
     aglFt: smoothAgl,
     flap: resolver.resolve(profile, state.sample, now),
-    units: state.units === 'kmh' ? 'kmh' : 'kt',
+    units: speedUnit(state.units),
+    windUnit: windUnit(state.windUnit),
     height: state.height === 'm' ? 'm' : 'ft',
     agl: aglFromState(state),
     groupHiddenFlapLabels: state.groupHiddenFlapLabels === true,

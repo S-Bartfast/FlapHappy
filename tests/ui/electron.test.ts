@@ -819,3 +819,43 @@ it.skipIf(!canRun)('fits main window controls as the actual Windows client width
    expect(await page.evaluate(()=>{const e=document.querySelector('.fh-main-controls')!;return e.getBoundingClientRect().width>=document.documentElement.clientWidth-25;})).toBe(true);
  }}finally{await app.close();}
 });
+
+it.skipIf(!canRun)('launch display units reach both panels and remain session-only', async()=>{
+  const ud=fs.mkdtempSync(path.join(os.tmpdir(),'fh-launch-units-'));
+  const fixture=makeProfile(3,{id:'units-fixture'});
+  fs.mkdirSync(path.join(ud,'profiles'));fs.writeFileSync(path.join(ud,'profiles',fixture.id+'.json'),exportProfileJson(fixture));
+  fs.writeFileSync(path.join(ud,'settings.json'),JSON.stringify({schema:'flaphappy.settings/1',units:'kmh',height:'ft',weight_unit:'kg',wind_unit:'auto',last_profile_id:fixture.id,active_by_title:{'Simulated glider':fixture.id}}));
+  let session=await launch(ud,['--source=simulated','--airspeed-unit=mph','--weight-unit=lb','--altitude-unit=m','--wind-unit=mps']);
+  let browser:import('playwright-core').Browser|undefined;
+  try {
+    let {app,page}=session;
+    const external=await openExternal(app,page);
+    const {chromium}=await import('playwright-core');const {chromePath}=await import('./browser-env');
+    browser=await chromium.launch({executablePath:chromePath(),args:['--no-sandbox']});
+    const cockpit=await browser.newPage();await cockpit.goto(panelUrl+'/panel.html');
+    await page.evaluate(()=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,{iasKt:100,totalWeightKg:400,flapCount:3,flapIndex:1,aglFt:600,windKt:20});sim.tick(0);});
+    for(const host of [external,cockpit]){
+      await host.waitForFunction(()=>document.querySelector('.fh-readout')?.textContent==='115 mph');
+      expect(await host.locator('.fh-sl-pct').textContent()).toBe('882 lb');
+      expect(await host.locator('.fh-aglread').textContent()).toMatch(/ m$/);
+      expect(await host.locator('.fh-aglwindtext').textContent()).toBe('10.3 m/s');
+    }
+    await page.click('.fh-main-settings');
+    expect(await page.locator('.fh-unitbtn.on:disabled').count()).toBe(4);
+    const {spawn}=await import('node:child_process');
+    const child=spawn(electronBin,[root,'--no-sandbox','--user-data='+ud,'--airspeed-unit=kt','--weight-unit=kg','--altitude-unit=ft','--wind-unit=kt'],{cwd:root,stdio:'ignore',windowsHide:true});
+    await new Promise<void>((resolve,reject)=>{child.once('exit',code=>code===0?resolve():reject(Error('Second instance exit '+code)));child.once('error',reject);});
+    for(const host of [external,cockpit]){
+      await host.waitForFunction(()=>document.querySelector('.fh-readout')?.textContent==='100 kt');
+      expect(await host.locator('.fh-sl-pct').textContent()).toBe('400 kg');
+      expect(await host.locator('.fh-aglwindtext').textContent()).toBe('20 kt');
+    }
+    await page.click('.fh-main-settings');
+    await app.close();
+    expect(settingsOnDisk(ud)).toMatchObject({units:'kmh',height:'ft',weight_unit:'kg',wind_unit:'auto'});
+    session=await launch(ud);({app,page}=session);
+    await page.click('.fh-main-settings');
+    expect(await page.locator('.fh-unitbtn.on:disabled').count()).toBe(0);
+    expect(await page.locator('.fh-unitbtn.on').allTextContents()).toEqual(['km/h','ft','kg','Follow airspeed']);
+  } finally {await browser?.close();await session.app.close().catch(()=>{});}
+});

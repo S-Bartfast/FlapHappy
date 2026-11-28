@@ -1,5 +1,15 @@
 /** Display unit. Profile files store metres per second; the app works in knots. */
-export type SpeedUnit = 'kt' | 'kmh';
+export type SpeedUnit = 'kt' | 'kmh' | 'mph';
+export type WindUnit = 'auto' | 'kt' | 'mps';
+export interface DisplayPreferences { units: SpeedUnit; height: HeightUnit; weight_unit: WeightUnit; wind_unit: WindUnit; }
+export type DisplayUnitOverrides = Partial<DisplayPreferences>;
+export function speedUnit(value: unknown): SpeedUnit { return value === 'kmh' || value === 'mph' ? value : 'kt'; }
+export function windUnit(value: unknown): WindUnit { return value === 'kt' || value === 'mps' ? value : 'auto'; }
+export function formatWind(kt: number | null, wind: WindUnit, speed: SpeedUnit): string {
+  if (wind === 'auto') return formatIas(kt, speed);
+  if (wind === 'kt') return formatIas(kt, 'kt');
+  return kt === null || !isFinite(kt) ? '--- m/s' : String(Math.round(kt * KT_TO_MS * 10) / 10) + ' m/s';
+}
 export type WeightUnit = 'kg' | 'lb';
 export const KG_PER_LB = 0.45359237;
 export function kilogramsToWeight(kg: number, unit: WeightUnit): number { return unit === 'lb' ? kg / KG_PER_LB : kg; }
@@ -8,11 +18,12 @@ export function formatWeightField(kg: number | null, unit: WeightUnit): string {
 
 /** International nautical mile: 1 knot = 1.852 km/h = 1852/3600 m/s. */
 export const KT_TO_KMH = 1.852;
+export const KT_TO_MPH = KT_TO_KMH / 1.609344;
 export const KT_TO_MS = 1852 / 3600;
 export const MS_TO_KT = 3600 / 1852;
 
 export function unitLabel(unit: SpeedUnit): string {
-  return unit === 'kmh' ? 'km/h' : 'kt';
+  return unit === 'kmh' ? 'km/h' : unit;
 }
 
 /** Metres per second for a saved profile, to two decimal places. */
@@ -26,11 +37,11 @@ export function msToKnots(ms: number): number {
 }
 
 export function knotsToUnit(kt: number, unit: SpeedUnit): number {
-  return unit === 'kmh' ? kt * KT_TO_KMH : kt;
+  return unit === 'kmh' ? kt * KT_TO_KMH : unit === 'mph' ? kt * KT_TO_MPH : kt;
 }
 
 export function unitToKnots(value: number, unit: SpeedUnit): number {
-  const kt = unit === 'kmh' ? value / KT_TO_KMH : value;
+  const kt = unit === 'kmh' ? value / KT_TO_KMH : unit === 'mph' ? value / KT_TO_MPH : value;
   return Math.round(kt * 10) / 10;
 }
 

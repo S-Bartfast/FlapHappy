@@ -4,6 +4,7 @@ import type { SimSample } from './sim';
 /** Authoritative active profile/ballast snapshot, separate from any editor draft. */
 export interface ActiveSession {
   revision: number;
+  launchUnits?: import('./units').DisplayUnitOverrides;
   ready: boolean;
   profile: Profile | null;
   ballast: number;
@@ -18,7 +19,8 @@ export interface CockpitState {
   receivedAt: number;
   /** Manual ballast fraction (ignored for profiles with valid loaded-weight anchors). */
   ballast: number;
-  units: 'kt' | 'kmh';
+  units: import('./units').SpeedUnit;
+  windUnit?: import('./units').WindUnit;
   height: 'ft' | 'm';
   weightUnit?: 'kg' | 'lb';
   /** AGL bar ends and the green band, in feet. */

@@ -86,6 +86,12 @@ Use these after `npm start --` or on the Windows executable. Flags with values a
 | `--compact` | Legacy compatibility switch; does not change the framed main window. |
 | `--smoke` | Developer startup check: print a smoke result and exit with a success/failure code. |
 | `--screenshot=<file.png>` | Developer capture of the main window after startup, then exit. Use an existing writable output directory; may be combined with `--smoke`. |
+| `--airspeed-unit=kt\|kmh\|mph` | Session-only indicated airspeed unit. |
+| `--weight-unit=kg\|lb` | Session-only flying-weight unit. |
+| `--altitude-unit=ft\|m` | Session-only altitude/AGL unit. |
+| `--wind-unit=kt\|mps` | Session-only independent wind-speed unit. |
+
+A launcher may supply any combination of these options. Invalid or omitted values leave the effective choices unchanged. Launch-supplied choices are locked for the process and preserve saved standalone preferences. A second launch applies only valid supplied units to the running session. Standalone Wind units can follow airspeed (the default), use knots, or use m/s. Both panels share the effective units. Demo inputs remain explicitly labelled in native test units.
 
 On a second launch, the existing instance is restored; data source, replay, recording and
 developer arguments do not reconfigure that running instance.
