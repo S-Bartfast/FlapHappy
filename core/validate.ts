@@ -82,26 +82,11 @@ export function validateProfile(p: Profile, opts: ValidateOptions = {}): Validat
         add('warning', 'structure', 'label-long-warn', `Label "${label}" is longer than ${RECOMMENDED_LABEL_CHARS} characters and will be shown smaller`, path + '.label');
       }
     }
-    if (row.handle_index === null || !Number.isInteger(row.handle_index) || row.handle_index < 0) {
-      add('error', 'structure', 'index-invalid', `Flap "${label || '?'}" needs a handle index (whole number, 0 or more)`, path + '.handle_index');
-    }
-  }
-  const seenIdx: number[] = [];
-  for (const { row, path } of allRows) {
-    if (row.handle_index === null || !Number.isInteger(row.handle_index)) continue;
-    if (seenIdx.indexOf(row.handle_index) >= 0) {
-      add('error', 'structure', 'index-duplicate', `Handle index ${row.handle_index} is used more than once`, path + '.handle_index');
-    }
-    seenIdx.push(row.handle_index);
   }
   const count = opts.liveHandleCount ?? p.handle_count;
-  if (count !== null && count !== undefined && count > 0) {
-    for (const { row, path } of allRows) {
-      if (row.handle_index !== null && row.handle_index >= count) {
-        const where = isNum(opts.liveHandleCount) ? 'the sim reports' : 'this profile expects';
-        add('warning', 'structure', 'index-range', `Handle index ${row.handle_index} is outside 0..${count - 1} (${where} ${count} positions)`, path + '.handle_index');
-      }
-    }
+  if (count !== null && count !== undefined && count > 0 && n > count) {
+    const where = isNum(opts.liveHandleCount) ? 'the sim reports' : 'this profile expects';
+    add('warning', 'structure', 'index-range', `${n} flap rows but ${where} only ${count} handle positions`);
   }
 
   // Missing either endpoint is a supported manual-ballast profile. Supplied

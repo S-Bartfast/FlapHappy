@@ -72,8 +72,10 @@ export interface ModelInput {
   manualBallast?: number;
   /** IAS after display smoothing (falls back to the raw sample when null). */
   ias: number | null;
-  /** Height after the same smoothing (falls back to the raw sample when null). */
+  /** Height for the bar, after the same smoothing (falls back to the readout height when null). */
   aglFt?: number | null;
+  /** Height for the readout (falls back to the raw sample when null). */
+  aglReadFt?: number | null;
   flap: CurrentFlap;
   /** Display unit. The profile's working speeds are knots. */
   units?: SpeedUnit;
@@ -135,8 +137,9 @@ export function buildDisplayModel(inp: ModelInput): DisplayModel {
   const shown = sample ? sample.iasKt : null;
   if (live && shown !== null && isFinite(shown)) base.iasText = formatIas(shown, units);
   if (live && sample && sample.aglFt !== null && isFinite(sample.aglFt)) {
-    const smoothed = inp.aglFt !== undefined && inp.aglFt !== null && isFinite(inp.aglFt) ? inp.aglFt : sample.aglFt;
-    const agl = formatAgl(sample.aglFt, height, aglScale);
+    const read = inp.aglReadFt !== undefined && inp.aglReadFt !== null && isFinite(inp.aglReadFt) ? inp.aglReadFt : sample.aglFt;
+    const smoothed = inp.aglFt !== undefined && inp.aglFt !== null && isFinite(inp.aglFt) ? inp.aglFt : read;
+    const agl = formatAgl(read, height, aglScale);
     const bar = formatAgl(smoothed, height, aglScale);
     base.aglText = agl.text;
     base.aglPos = bar.pos;

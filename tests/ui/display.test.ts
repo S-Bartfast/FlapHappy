@@ -127,7 +127,7 @@ describe('current-flap highlight and IAS marker', () => {
       await settle(page, 120);
       const cur = await page.$$eval('.fh-display .fh-cell', (els) => els.map((e) => e.classList.contains('current')));
       expect(cur.filter(Boolean)).toHaveLength(1);
-      expect(cur.indexOf(true)).toBe(i);
+      expect(cur.indexOf(true)).toBe(5 - i);
     }
     await page.close();
   });
@@ -155,7 +155,7 @@ describe('current-flap highlight and IAS marker', () => {
     await clickBallast(page, 0);
     await settle(page);
     await page.evaluate(() => { (window as any).__flapHappy.app.profile.marker_smoothing_ms = 0; });
-    await sim(page, { flapIndex: 1, iasKt: 94 });
+    await sim(page, { flapIndex: 4, iasKt: 94 });
     await settle(page);
     const g = await geometry(page);
     expect(g.current).toBe(1);
@@ -173,7 +173,7 @@ describe('states and the current-flap fallback chain (simulated feed)', () => {
     const page = await env.newPage('?seed=demo');
     const p = makeProfile(6); // indices 0..5, 8 lever positions
     await load(page, p);
-    await sim(page, { flapCount: 8, flapIndex: 3, iasKt: 90, fault: 'none' });
+    await sim(page, { flapCount: 8, flapIndex: 2, iasKt: 90, fault: 'none' });
     await settle(page, 200);
     const cur = () => page.$$eval('.fh-display .fh-cell', (els) => els.map((e, i) => (e.classList.contains('current') ? i : -1)).filter((i) => i >= 0));
     expect(await cur()).toEqual([3]);
@@ -187,7 +187,7 @@ describe('states and the current-flap fallback chain (simulated feed)', () => {
     await sim(page, { fault: 'index-out-of-range' });
     await page.waitForTimeout(300);
     expect(await cur()).toEqual([3]);
-    // percent only (8 positions: 3/7)
+    // percent only (8 positions: 2/7)
     await sim(page, { fault: 'percent-only' });
     await page.waitForTimeout(300);
     expect(await cur()).toEqual([3]);
@@ -204,6 +204,20 @@ describe('states and the current-flap fallback chain (simulated feed)', () => {
     await page.waitForTimeout(300);
     expect(await cur()).toEqual([]);
     expect(await text(page, '.fh-display .fh-badge')).toBe('#6');
+    await page.close();
+  });
+
+  it('a fresh AGL after a stale gap is shown straight away, not averaged with the old height', async () => {
+    const page = await env.newPage('?seed=demo');
+    await load(page, makeProfile(6));
+    await sim(page, { connected: true, inFlight: true, onGround: false, fault: 'none', aglFt: 600 });
+    await settle(page, 1300);
+    expect(await text(page, '.fh-display .fh-aglread')).toBe('600 ft');
+    await sim(page, { fault: 'stale' });
+    await page.waitForTimeout(2000);
+    expect(await text(page, '.fh-display .fh-status')).toContain('No data');
+    await sim(page, { fault: 'none', aglFt: 200 });
+    expect(await text(page, '.fh-display .fh-aglread')).toBe('200 ft');
     await page.close();
   });
 
@@ -243,7 +257,6 @@ describe('states and the current-flap fallback chain (simulated feed)', () => {
     const labels = ['5', 'N', '4', '3', '2', '1'];
     p.flaps.forEach((f, i) => {
       f.label = labels[i];
-      f.handle_index = 5 - i;
     });
     p.vne = null;
     await load(page, p);

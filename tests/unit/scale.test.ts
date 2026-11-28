@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bucketIndex, columnEdges, effectiveBoundaries, effectiveSpeed, mapMarker, nativeWidth, smoothStep, tickLabels } from '../../core/scale';
+import { AGL_AVERAGE_MS, RollingAverage, bucketIndex, columnEdges, effectiveBoundaries, effectiveSpeed, mapMarker, nativeWidth, smoothStep, tickLabels } from '../../core/scale';
 import { makeProfile } from './helpers';
 
 describe('ballast interpolation', () => {
@@ -113,5 +113,34 @@ describe('sizing and smoothing', () => {
     expect(v).toBeCloseTo(80, 2);
     const one = smoothStep(60, 80, 300, 300);
     expect(one).toBeCloseTo(60 + 20 * (1 - Math.exp(-1)), 8);
+  });
+
+  it('AGL average is the time-weighted mean over the last second', () => {
+    const avg = new RollingAverage(AGL_AVERAGE_MS);
+    expect(avg.value(0)).toBeNull();
+    avg.add(0, 300);
+    expect(avg.value(0)).toBe(300);
+    avg.add(500, 400);
+    expect(avg.value(750)).toBeCloseTo((300 * 500 + 400 * 250) / 750, 8);
+    expect(avg.value(1000)).toBeCloseTo(350, 8);
+    expect(avg.value(1250)).toBeCloseTo(375, 8);
+    expect(avg.value(1500)).toBe(400);
+    avg.add(400, 999);
+    expect(avg.value(1500)).toBe(400);
+    avg.reset();
+    expect(avg.value(2000)).toBeNull();
+  });
+
+  it('AGL average turns terrain steps into a steady ramp', () => {
+    const avg = new RollingAverage(AGL_AVERAGE_MS);
+    const shown: number[] = [];
+    for (let t = 0; t <= 3000; t += 75) {
+      avg.add(t, 300 + Math.floor(t / 350) * 40);
+      shown.push(avg.value(t) as number);
+    }
+    const tail = shown.slice(shown.length - 20);
+    const steps = tail.slice(1).map((v, i) => v - tail[i]);
+    for (const s of steps) expect(s).toBeGreaterThan(0);
+    expect(Math.max(...steps)).toBeLessThan(15);
   });
 });

@@ -7,9 +7,9 @@ export interface Speed {
   max_ballast_kt: number | null;
 }
 
+/** A row's sim handle index is its position from the fastest end: see `handleIndexOf`. */
 export interface FlapPosition {
   label: string;
-  handle_index: number | null;
 }
 
 export type CurrentFlapSource = 'index' | 'percent' | 'lvar';

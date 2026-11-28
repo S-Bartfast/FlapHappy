@@ -169,7 +169,8 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-table { margin: 6px 0; }
 .fh-erow { display: flex; align-items: center; flex-wrap: wrap; padding: 4px 6px; border-radius: 6px; }
 .fh-erow > * { margin-right: 6px; margin-top: 2px; margin-bottom: 2px; }
-.fh-frow { background: #151d28; border: 1px solid #263345; margin-top: 4px; margin-left: 22px; margin-right: 22px; cursor: move; -webkit-transition: margin-top 0.12s ease, padding 0.12s ease, height 0.12s ease, opacity 0.12s ease, border-color 0.12s ease; transition: margin-top 0.12s ease, padding 0.12s ease, height 0.12s ease, opacity 0.12s ease, border-color 0.12s ease; }
+/* Halfway between the full-width Vne/stall rows and the ~545px transition rows. */
+.fh-frow { background: #151d28; border: 1px solid #263345; margin-top: 4px; margin-left: max(0px, calc((100% - 545px) / 4)); margin-right: max(0px, calc((100% - 545px) / 4)); cursor: move; -webkit-transition: margin-top 0.12s ease, padding 0.12s ease, height 0.12s ease, opacity 0.12s ease, border-color 0.12s ease; transition: margin-top 0.12s ease, padding 0.12s ease, height 0.12s ease, opacity 0.12s ease, border-color 0.12s ease; }
 .fh-frow input, .fh-frow select { cursor: auto; }
 .fh-frow button { cursor: pointer; }
 .fh-grip { color: #6f8196; font-size: 16px; margin-right: 4px; }
@@ -182,8 +183,10 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-trow .fh-rowname { width: auto; }
 .fh-trow.prefilled .fh-in { border-color: #ffb84d; color: #ffd08a; }
 .fh-speedrow.fh-minrow, .fh-speedrow.fh-maxrow { background: #101a26; border: 1px solid #263345; margin-top: 4px; }
-.fh-speedrow.fh-maxrow { position: relative; justify-content: center; }
-.fh-maxrow .fh-rowname { position: absolute; left: 6px; width: auto; }
+.fh-speedrow.fh-maxrow, .fh-speedrow.fh-minrow { position: relative; justify-content: center; }
+.fh-maxrow .fh-rowname, .fh-minrow .fh-rowname { position: absolute; left: 6px; width: auto; }
+.fh-speedrow.fh-minrow { padding-left: 92px; padding-right: 92px; }
+.fh-minrow > :last-child { margin-right: 0; }
 .fh-vneval { display: flex; align-items: center; margin-right: 0; }
 .fh-vneval > * { margin-right: 6px; }
 .fh-vneval > *:last-child { margin-right: 0; }
@@ -192,8 +195,18 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-transname { color: #8fc2ee; font-weight: 500; }
 .fh-sub { color: #8da0b6; font-size: 12px; }
 .fh-speed { width: 78px; }
+.fh-speedbox { position: relative; display: inline-block; }
+.fh-speedbox .fh-speed { width: 72px; padding-right: 39px; }
+.fh-weightbox .fh-speed { padding-right: 26px; }
+.fh-speedbox .fh-speed::-webkit-inner-spin-button, .fh-speedbox .fh-speed::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+/* Same font size and top inset as the input text, so the smaller unit text shares its baseline. */
+.fh-insuffix { position: absolute; right: 7px; top: 0; padding-top: 6px; font-size: 14px; line-height: normal; color: #6f8196; pointer-events: none; }
+.fh-insuffix > span { font-size: 12px; }
+.fh-speedbox .fh-speed:not([placeholder=""]):placeholder-shown { padding-right: 7px; }
+.fh-speed:not([placeholder=""]):placeholder-shown + .fh-insuffix { display: none; }
 .fh-lbl { width: 70px; }
-.fh-handle { width: 66px; }
+.fh-simidx { margin-left: 8px; }
+.fh-weightlab { margin-left: 14px; }
 .fh-rowbtns { display: flex; margin-left: auto; }
 .fh-rowbtns .fh-btn { margin-left: 4px; padding: 4px 8px; }
 .fh-tools { display: flex; flex-wrap: wrap; margin: 10px 0; }
@@ -227,12 +240,12 @@ button, input, select { font-family: inherit; font-size: 14px; }
 /* -------------------------------------------------------------- Dev panel */
 .fh-dev { margin-top: 10px; }
 .fh-devpanel { border: 1px dashed #7a5c1f; border-radius: 8px; padding: 8px 10px; background: #14110a; }
-.fh-devtitle { color: #ffb84d; font-weight: 700; margin-bottom: 4px; }
+.fh-devtitle { color: #ffb84d; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; }
 .fh-devrow { display: flex; align-items: center; flex-wrap: wrap; margin: 4px 0; }
 .fh-devrow > * { margin-right: 8px; margin-top: 2px; margin-bottom: 2px; }
 .fh-devlab { color: #b8a77a; }
 .fh-dev-ias, .fh-dev-aglrange { width: 260px; }
-.fh-dev-iasnum, .fh-dev-count, .fh-dev-agl { width: 72px; }
+.fh-dev-iasnum, .fh-dev-count, .fh-dev-flap, .fh-dev-agl { width: 72px; }
 .fh-dev-title { width: 180px; }
 .fh-devrow .fh-btn { margin-left: 0; padding: 3px 8px; }
 .fh-devstate { color: #b8a77a; }
@@ -264,8 +277,7 @@ button, input, select { font-family: inherit; font-size: 14px; }
 
 .fh-badge.mapped { color:#fff; background:#275b82; }
 .fh-trow { max-width:100%; }
-.fh-transition-toggle { display:inline-flex; align-items:center; margin-right:8px; color:#cfd9e6; font-size:12px; cursor:pointer; }
-.fh-transition-toggle > span:first-child { margin-right:6px; }
+.fh-transition-toggle { display:inline-flex; align-items:center; margin:4px 14px 4px 6px; color:#cfd9e6; font-size:12px; cursor:pointer; }
 .fh-transition-toggle .fh-slide { flex:0 0 44px; }
 .fh-transition-toggle .fh-slide input:focus + .fh-slidetrack { outline:2px solid #8fc2ee; outline-offset:2px; }
 .fh-trow > [hidden] { display:none !important; }

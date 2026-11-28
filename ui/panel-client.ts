@@ -1,10 +1,11 @@
 import type { CockpitState } from '../core/cockpit';
 import type { Profile } from '../core/types';
+import type { SimSample } from '../core/sim';
 import { usesManualBallast } from '../core/weight';
 import { validateProfile } from '../core/validate';
 import { CurrentFlapResolver } from '../core/flapmap';
 import { buildDisplayModel, deriveLink } from '../core/display-model';
-import { smoothStep } from '../core/scale';
+import { AGL_AVERAGE_MS, RollingAverage, smoothStep } from '../core/scale';
 import type { AglScale } from '../core/units';
 import { h, setText } from './dom';
 import { StripView } from './strip';
@@ -30,11 +31,30 @@ let shownBallast = 0;
 const resolver = new CurrentFlapResolver();
 let smoothIas: number | null = null;
 let smoothAgl: number | null = null;
+let avgAgl: number | null = null;
 let smoothAt = 0;
+const aglAverage = new RollingAverage(AGL_AVERAGE_MS);
+let aglSampleT: number | null = null;
 
 function resetSmoothing(): void {
-  smoothIas = smoothAgl = null;
+  smoothIas = smoothAgl = avgAgl = null;
   smoothAt = 0;
+  aglAverage.reset();
+  aglSampleT = null;
+}
+
+function averageAgl(sample: SimSample, now: number): number | null {
+  const agl = sample.aglFt;
+  if (agl === null || !isFinite(agl)) {
+    aglAverage.reset();
+    aglSampleT = null;
+    return null;
+  }
+  if (sample.t !== aglSampleT) {
+    aglSampleT = sample.t;
+    aglAverage.add(now, agl);
+  }
+  return aglAverage.value(now);
 }
 
 function smoothValue(previous: number | null, value: number | null, dt: number, tau: number): number | null {
@@ -97,7 +117,8 @@ function paint(state: CockpitState): void {
     const dt = smoothAt ? now - smoothAt : 0;
     const tau = profile.marker_smoothing_ms;
     smoothIas = smoothValue(smoothIas, state.sample.iasKt, dt, tau);
-    smoothAgl = smoothValue(smoothAgl, state.sample.aglFt, dt, tau);
+    avgAgl = averageAgl(state.sample, now);
+    smoothAgl = smoothValue(smoothAgl, avgAgl, dt, tau);
     smoothAt = now;
   } else resetSmoothing();
   const model = buildDisplayModel({
@@ -108,6 +129,7 @@ function paint(state: CockpitState): void {
     manualBallast: f,
     ias: smoothIas,
     aglFt: smoothAgl,
+    aglReadFt: avgAgl,
     flap: resolver.resolve(profile, state.sample, now),
     units: state.units === 'kmh' ? 'kmh' : 'kt',
     height: state.height === 'm' ? 'm' : 'ft',
