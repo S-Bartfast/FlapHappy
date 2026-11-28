@@ -1,12 +1,20 @@
 import type { Profile } from './types';
 import type { SimSample } from './sim';
 
-/** Live display state the desktop app publishes for the in-sim cockpit panel. */
+/** Authoritative active profile/ballast snapshot, separate from any editor draft. */
+export interface ActiveSession {
+  revision: number;
+  ready: boolean;
+  profile: Profile | null;
+  ballast: number;
+}
+
+/** Live display state published by the main process for the shared in-sim and external display. */
 export interface CockpitState {
   ready: boolean;
   profile: Profile | null;
   sample: SimSample | null;
-  /** When the desktop app last received `sample`, in ms. */
+  /** When the session last received `sample`, in ms. */
   receivedAt: number;
   /** Manual ballast fraction (ignored for profiles with valid loaded-weight anchors). */
   ballast: number;
