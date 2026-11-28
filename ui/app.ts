@@ -503,6 +503,12 @@ export class App {
     this.renderAll();
   }
 
+  setSimpleFlap(on: boolean): void {
+    this.settings.ui.simple_flap = on;
+    this.persistSoon();
+    this.renderAll();
+  }
+
   setShowTransitions(on: boolean): void {
     this.settings.ui.show_transitions = on;
     this.persistSoon();
@@ -622,7 +628,7 @@ export class App {
     const model = this.buildModelFor(this.profile, this.validation);
     this.lastModel = model;
     this.slider?.render(this.profile, model.weight, this.ballast, this.settings.weight_unit);
-    this.strip?.render(model, { profile: this.profile, zoom: this.settings.ui.zoom, showBallast: this.settings.ui.show_ballast, showAgl: this.settings.ui.show_agl, showTransitions: this.settings.ui.show_transitions, showWind: this.settings.ui.show_wind, barShading: this.settings.ui.bar_shading });
+    this.strip?.render(model, { profile: this.profile, zoom: this.settings.ui.zoom, showBallast: this.settings.ui.show_ballast, showAgl: this.settings.ui.show_agl, simpleFlap: this.settings.ui.simple_flap, showTransitions: this.settings.ui.show_transitions, showWind: this.settings.ui.show_wind, barShading: this.settings.ui.bar_shading });
     setText(this.titleEl, this.profile ? profileLabel(this.profile.id) : 'Flap Happy');
     const bits: string[] = [];
     if (model.statusText) bits.push(model.statusText);
