@@ -8,7 +8,7 @@ const p6 = () => {
   p.handle_count = 8;
   return p;
 };
-// Row k: handle index k. Percent follows the same index across 8 lever positions.
+// Row k: handle index 5-k. Percent follows the same index across 8 lever positions.
 const at = (idx: number | null, extra: Record<string, unknown> = {}) =>
   sample({ flapIndex: idx, flapCount: 8, flapPercent: idx === null ? null : idx / 7, ...extra });
 
@@ -18,7 +18,7 @@ describe('current flap resolution', () => {
     const p = p6();
     for (let i = 0; i < 6; i++) {
       const f = r.resolve(p, at(i), 1000 + i * 100);
-      expect(f).toMatchObject({ status: 'row', rowIndex: i, label: String(i + 1), via: 'index' });
+      expect(f).toMatchObject({ status: 'row', rowIndex: 5 - i, label: String(6 - i), handleIndex: i, via: 'index' });
     }
   });
 
@@ -29,22 +29,21 @@ describe('current flap resolution', () => {
     expect(r.resolve(q, at(5, { flapCount: 8 }), 0)).toMatchObject({ status: 'unlisted', rowIndex: null, label: '#5' });
   });
 
-  it('does not depend on lever direction: the mapping is in the profile', () => {
+  it('the fastest row (last in the profile) is handle index 0', () => {
     const p = makeProfile(3);
-    p.flaps[0].handle_index = 2;
-    p.flaps[2].handle_index = 0;
-    const f = new CurrentFlapResolver().resolve(p, at(2, { flapCount: 3 }), 0);
-    expect(f.rowIndex).toBe(0);
+    const r = new CurrentFlapResolver();
+    expect(r.resolve(p, at(0, { flapCount: 3 }), 0).rowIndex).toBe(2);
+    expect(r.resolve(p, at(2, { flapCount: 3 }), 0).rowIndex).toBe(0);
   });
 
   it('missing index falls back to percent', () => {
     const f = new CurrentFlapResolver().resolve(p6(), at(3, { flapIndex: null }), 0);
-    expect(f).toMatchObject({ status: 'row', rowIndex: 3, via: 'percent' });
+    expect(f).toMatchObject({ status: 'row', rowIndex: 2, via: 'percent' });
   });
 
   it('out-of-range index falls back to percent', () => {
     const f = new CurrentFlapResolver().resolve(p6(), at(2, { flapIndex: 11 }), 0);
-    expect(f).toMatchObject({ status: 'row', rowIndex: 2, via: 'percent' });
+    expect(f).toMatchObject({ status: 'row', rowIndex: 3, via: 'percent' });
   });
 
   it('NaN index is treated as missing', () => {
@@ -55,14 +54,14 @@ describe('current flap resolution', () => {
   it('falls to percent (even spacing) when the index is missing', () => {
     const s = at(null, { flapPercent: 3 / 7 });
     const f = new CurrentFlapResolver().resolve(p6(), s, 0);
-    expect(f).toMatchObject({ status: 'row', rowIndex: 3, via: 'percent' });
+    expect(f).toMatchObject({ status: 'row', rowIndex: 2, via: 'percent' });
   });
 
   it('uses the named L: var last', () => {
     const p = p6();
     p.current_flap.lvar_name = 'FLAP_POS';
     const s = at(null, { flapPercent: null, lvar: 4 });
-    expect(new CurrentFlapResolver().resolve(p, s, 0)).toMatchObject({ rowIndex: 4, via: 'lvar' });
+    expect(new CurrentFlapResolver().resolve(p, s, 0)).toMatchObject({ rowIndex: 1, via: 'lvar' });
     p.current_flap.lvar_name = null;
     expect(new CurrentFlapResolver().resolve(p, s, 0).status).toBe('unknown');
   });
@@ -71,7 +70,7 @@ describe('current flap resolution', () => {
     const p = p6();
     p.current_flap.source = 'percent';
     const s = at(1, { flapPercent: 3 / 7 });
-    expect(new CurrentFlapResolver().resolve(p, s, 0)).toMatchObject({ rowIndex: 3, via: 'percent' });
+    expect(new CurrentFlapResolver().resolve(p, s, 0)).toMatchObject({ rowIndex: 2, via: 'percent' });
   });
 
   it('everything unreadable gives unknown (FLAP ?) and no row', () => {
@@ -99,6 +98,6 @@ describe('current flap resolution', () => {
     r.setManual(2);
     expect(r.resolve(p, s, 0).status).toBe('unknown');
     p.current_flap.manual_fallback = true;
-    expect(r.resolve(p, s, 0)).toMatchObject({ rowIndex: 2, via: 'manual' });
+    expect(r.resolve(p, s, 0)).toMatchObject({ rowIndex: 2, handleIndex: 3, via: 'manual' });
   });
 });

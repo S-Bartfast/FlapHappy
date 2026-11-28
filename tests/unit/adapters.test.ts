@@ -12,6 +12,7 @@ import { defaultSettings } from '../../core/settings';
 import { makeProfile, sample } from './helpers';
 import { PRESETS } from '../../profiles';
 import { CurrentFlapResolver } from '../../core/flapmap';
+import { handleIndexOf } from '../../core/profile';
 import { buildDisplayModel } from '../../core/display-model';
 import { validateProfile } from '../../core/validate';
 import { effectiveBoundaries } from '../../core/scale';
@@ -225,7 +226,7 @@ describe('scenarios', () => {
     const src = new SimulatedSource(() => now);
     src.controls.flapCount = 6;
     const resolver = new CurrentFlapResolver();
-    const pl = new ScenarioPlayer(soak as unknown as Scenario, { vs: profile.vs_min.no_ballast_kt as number, vne: profile.vne as number, rowHandles: profile.flaps.map((r) => r.handle_index as number) });
+    const pl = new ScenarioPlayer(soak as unknown as Scenario, { vs: profile.vs_min.no_ballast_kt as number, vne: profile.vne as number, rowHandles: profile.flaps.map((_, i) => handleIndexOf(profile, i)) });
     let seen = 0;
     let ballast = 0;
     let last: SimSample | null = null;

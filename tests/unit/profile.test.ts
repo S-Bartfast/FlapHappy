@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addRow, createBlankProfile, deleteRow, exportProfileJson, insertRowAfter, insertRowBefore, moveLabel,
-  normalizeProfile, parseProfileJson, prefillMaxBallast, sanitizeId,
+  addRow, createBlankProfile, deleteRow, exportProfileJson, handleIndexOf, insertRowAfter, insertRowBefore, moveLabel,
+  normalizeProfile, parseProfileJson, prefillMaxBallast, rowForHandle, sanitizeId,
   uniqueId, transitionName, profileMatchesTitle,
 } from '../../core/profile';
 import { PRESETS } from '../../profiles';
@@ -17,7 +17,7 @@ describe('profile import / export', () => {
     expect(PRESETS.map(p => p.profile.weight_kg)).toEqual([{light:485,heavy:600},{light:475,heavy:550},{light:378,heavy:600}]);
     const as33 = PRESETS[0].profile;
     expect(as33.flaps.map((f) => f.label)).toEqual(['5', 'N', '4', '3', '2', '1']);
-    expect(as33.flaps.map((f) => f.handle_index)).toEqual([5, 4, 3, 2, 1, 0]);
+    expect(JSON.parse(exportProfileJson(as33)).flaps.map((f: { handle_index: number }) => f.handle_index)).toEqual([5, 4, 3, 2, 1, 0]);
     expect(as33.transitions).toHaveLength(5);
     expect(as33.vne).not.toBeNull();
     for (const preset of PRESETS) {
@@ -116,10 +116,18 @@ describe('row editing keeps N-1 transitions', () => {
 
   it('append prefills the midpoint of the last boundary and Vne (both ends)', () => {
     const p = makeProfile(2); // vs 40/50, T1 52/66, vne 82
-    const r = addRow(p);
+    const r = insertRowAfter(p, 1);
     expect(r.prefilled).toBe(1);
     expect(r.profile.transitions[1]).toEqual({ no_ballast_kt: 67, max_ballast_kt: 74 });
     expect(r.profile.transitions[0]).toEqual(p.transitions[0]);
+  });
+
+  it('add row prefills the midpoint of Vs and the first transition', () => {
+    const p = makeProfile(2);
+    const r = addRow(p);
+    expect(r.prefilled).toBe(0);
+    expect(r.profile.transitions[0]).toEqual({ no_ballast_kt: 46, max_ballast_kt: 58 });
+    expect(r.profile.transitions[1]).toEqual(p.transitions[0]);
   });
 
   it('one row: new transition is the midpoint of Vs and Vne', () => {
@@ -159,27 +167,20 @@ describe('row editing keeps N-1 transitions', () => {
     expect(r.profile.transitions[1].no_ballast_kt).toBeNull();
   });
 
-  it('add and delete leave the other sim indexes alone; a new row starts blank', () => {
-    const up = makeProfile(3);
-    const added = addRow(deleteRow(up, 1)).profile;
-    expect(added.flaps.map((f) => f.handle_index)).toEqual([0, 2, null]);
-    expect(added.flaps.map((f) => f.label)).toEqual(['1', '3', '4']);
-
-    const down = makeProfile(4);
-    down.flaps.forEach((f, i) => (f.handle_index = 3 - i));
-    const removed = deleteRow(down, 1);
-    expect(removed.flaps.map((f) => f.handle_index)).toEqual([3, 1, 0]);
-    expect(removed.flaps.map((f) => f.label)).toEqual(['1', '3', '4']);
-    const extended = addRow(removed).profile;
-    expect(extended.flaps.map((f) => f.handle_index)).toEqual([3, 1, 0, null]);
+  it('sim handle indexes follow row order, with the fastest row at 0', () => {
+    const p = makeProfile(4);
+    expect(p.flaps.map((_, i) => handleIndexOf(p, i))).toEqual([3, 2, 1, 0]);
+    expect([0, 1, 2, 3, 4, -1].map((idx) => rowForHandle(p, idx))).toEqual([3, 2, 1, 0, -1, -1]);
+    const legacy = parseProfileJson(exportProfileJson(p).replace(/"handle_index": \d+/g, '"handle_index": 7')).profile!;
+    expect(JSON.parse(exportProfileJson(legacy)).flaps.map((f: { handle_index: number }) => f.handle_index)).toEqual([3, 2, 1, 0]);
   });
 
-  it('a new row on a downward list is blank and keeps the old indexes', () => {
+  it('a new row goes at the slow end, so existing rows keep their sim indexes', () => {
     const p = makeProfile(6);
-    p.flaps.forEach((f, i) => (f.handle_index = 5 - i));
     const added = addRow(p).profile;
-    expect(added.flaps.map((f) => f.handle_index)).toEqual([null, 5, 4, 3, 2, 1, 0]);
     expect(added.flaps.slice(1).map((f) => f.label)).toEqual(['1', '2', '3', '4', '5', '6']);
+    expect(added.flaps.slice(1).map((_, i) => handleIndexOf(added, i + 1))).toEqual([5, 4, 3, 2, 1, 0]);
+    expect(deleteRow(makeProfile(4), 1).flaps.map((f) => f.label)).toEqual(['1', '3', '4']);
   });
 
   it('delete removes the slower-side transition (or the first one for row 0)', () => {
@@ -202,11 +203,10 @@ describe('row editing keeps N-1 transitions', () => {
     }
   });
 
-  it('moving a label shifts the others; the sim indexes and transitions stay put', () => {
+  it('moving a label shifts the others; the transitions stay put', () => {
     const p = makeProfile(3);
     const q = moveLabel(p, 0, 2);
     expect(q.flaps.map((f) => f.label)).toEqual(['2', '3', '1']);
-    expect(q.flaps.map((f) => f.handle_index)).toEqual([0, 1, 2]);
     expect(q.transitions).toEqual(p.transitions);
     expect(moveLabel(p, 2, 0).flaps.map((f) => f.label)).toEqual(['3', '1', '2']);
     expect(moveLabel(p, 1, 1)).toBe(p);

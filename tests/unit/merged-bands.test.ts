@@ -13,7 +13,7 @@ describe('adjacent excluded transitions',()=>{
   expect(flapGroups(p).labels).toEqual(['L-6-5','N','4-3','2','1']);
   expect(validateProfile(p).ok).toBe(true);
   expect(effectiveBoundaries(p,0)).toEqual([40,76,88,112,124,p.vne]);
-  const s=sample({totalWeightKg:400,flapIndex:1,flapCount:8});
+  const s=sample({totalWeightKg:400,flapIndex:6,flapCount:8});
   const m=buildDisplayModel({groupHiddenFlapLabels:true,profile:p,validation:validateProfile(p),sample:s,link:'live',manualBallast:0,ias:80,flap:new CurrentFlapResolver().resolve(p,s,1000)});
   expect(m.cells.map(c=>c.label)).toEqual(['L-6-5','N','4-3','2','1']);expect(m.currentRow).toBe(0);expect(m.badge).toEqual({kind:'mapped',text:'6'});
   const legacy=buildDisplayModel({profile:p,validation:validateProfile(p),sample:s,link:'live',manualBallast:0,ias:80,flap:new CurrentFlapResolver().resolve(p,s,1000)});

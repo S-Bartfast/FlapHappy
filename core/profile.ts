@@ -104,11 +104,17 @@ function normSpeed(x: unknown): Speed {
 
 function normFlap(x: unknown): FlapPosition {
   const r = isObj(x) ? x : {};
-  const hi = r.handle_index;
-  return {
-    label: strOr(r.label, ''),
-    handle_index: typeof hi === 'number' && isFinite(hi) ? hi : null,
-  };
+  return { label: strOr(r.label, '') };
+}
+
+/** Rows are stored slowest first and the fastest row is sim handle index 0. */
+export function handleIndexOf(p: Pick<Profile, 'flaps'>, row: number): number {
+  return p.flaps.length - 1 - row;
+}
+
+/** The row for a sim handle index, or -1 when the profile has no such row. */
+export function rowForHandle(p: Pick<Profile, 'flaps'>, idx: number): number {
+  return idx >= 0 && idx < p.flaps.length ? p.flaps.length - 1 - idx : -1;
 }
 
 export interface ParseResult {
@@ -214,8 +220,9 @@ function speedToFile(s: Speed): { no_ballast_ms: number | null; max_ballast_ms: 
   };
 }
 
-function flapToFile(f: FlapPosition): Raw {
-  return { label: f.label, handle_index: f.handle_index };
+// handle_index is derived from row order and ignored on load; it is still written for older app versions.
+function flapToFile(p: Profile, f: FlapPosition, i: number): Raw {
+  return { label: f.label, handle_index: handleIndexOf(p, i) };
 }
 
 /** Saved profile text. Speeds are metres per second. */
@@ -225,7 +232,7 @@ export function exportProfileJson(p: Profile): string {
     id: p.id,
     match: { title_contains: p.match.title_contains.slice() },
     units: 'ms',
-    flaps: p.flaps.map(flapToFile),
+    flaps: p.flaps.map((f, i) => flapToFile(p, f, i)),
     handle_count: p.handle_count,
     vs_min: speedToFile(p.vs_min),
     transitions: p.transitions.map(t => ({ ...speedToFile(t), ...(t.exclude_from_display === true ? { exclude_from_display:true } : {}) })),
@@ -290,10 +297,7 @@ export function nextFreeLabel(p: Profile): string {
 }
 
 export function newRow(p: Profile, partial?: Partial<FlapPosition>): FlapPosition {
-  return {
-    label: partial?.label ?? nextFreeLabel(p),
-    handle_index: partial && partial.handle_index !== undefined ? partial.handle_index : null,
-  };
+  return { label: partial?.label ?? nextFreeLabel(p) };
 }
 
 /**
@@ -317,9 +321,8 @@ export function insertRowAt(p: Profile, pos: number, row?: FlapPosition): EditRe
 }
 
 export function addRow(p: Profile, row?: FlapPosition): EditResult {
-  // A downward sequence (5, 4, 3, 2, 1, 0) still grows at the top. The new index is left blank.
-  const at = isStepDescending(p.flaps) ? 0 : p.flaps.length;
-  return insertRowAt(p, at, row);
+  // Grow at the slow end so existing rows keep their sim handle indexes.
+  return insertRowAt(p, 0, row);
 }
 
 export function insertRowAfter(p: Profile, i: number, row?: FlapPosition): EditResult {
@@ -339,17 +342,7 @@ export function deleteRow(p: Profile, i: number): Profile {
   return out;
 }
 
-function isStepDescending(flaps: FlapPosition[]): boolean {
-  if (flaps.length < 2) return false;
-  for (let i = 1; i < flaps.length; i++) {
-    const a = flaps[i - 1].handle_index;
-    const b = flaps[i].handle_index;
-    if (a === null || b === null || b !== a - 1) return false;
-  }
-  return true;
-}
-
-/** Move the label at `from` into slot `to`, shifting the labels between. Sim indexes and transitions stay put. */
+/** Move the label at `from` into slot `to`, shifting the labels between. Transitions stay put. */
 export function moveLabel(p: Profile, from: number, to: number): Profile {
   const n = p.flaps.length;
   if (from === to || from < 0 || to < 0 || from >= n || to >= n) return p;
