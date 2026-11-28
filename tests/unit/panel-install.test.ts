@@ -55,7 +55,7 @@ describe('Flap Happy managed panel installation',()=>{
  });
  it('rollback on swap failure; running simulator prevents mutation; unknown file survives',()=>{
   const f=fixture(),target=join(f.community,'flaphappy-ingamepanel');
-  expect(f.install().ok).toBe(true);f.version('1.0.2');
+  f.version('1.0.0');expect(f.install().ok).toBe(true);f.version('1.0.2');
   const result=f.install(def,(a,b)=>{if(String(a).endsWith('new-package'))throw Error('injected failure');renameSync(a,b);});
   expect(result.ok).toBe(false);expect(f.status().installedVersion).toBe('1.0.0');
   expect(installCockpitPanel(f.bundle,def,f.community,renameSync,()=>true).ok).toBe(false);
