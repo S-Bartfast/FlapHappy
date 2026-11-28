@@ -96,6 +96,31 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
     }finally{await browser?.close();await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
   });
 
+  it('persists Auto-hide preference across restart and publishes it without hiding the external panel', async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-auto-hide-'));let session=await launch(ud);
+    try {
+      let {app,page}=session; const read=async()=> (await (await fetch(panelUrl+'/panel-settings')).json()).autoHideExternal;
+      const external=await openExternal(app,page);
+      expect(await read()).toBe(false);
+      await page.click('.fh-main-settings');await page.getByText('Window and app',{exact:true}).click();
+      const check=page.locator('.fh-auto-hide-external');
+      expect(await check.isChecked()).toBe(false);
+      await check.check();
+      await waitUntil(async()=>await read()===true,'auto-hide endpoint');
+      expect((await getFeed()).autoHideExternal).toBe(true);
+      expect(await external.locator('.fh-fit').isVisible()).toBe(true);
+      const process=app.process();await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Flap Happy')!.close());
+      await waitUntil(()=>process.exitCode!==null,'close flush');
+      session=await launch(ud);({app,page}=session);
+      expect(await read()).toBe(true);
+      const again=await openExternal(app,page);expect(await again.locator('.fh-fit').isVisible()).toBe(true);
+      await page.click('.fh-main-settings');await page.getByText('Window and app',{exact:true}).click();
+      expect(await page.locator('.fh-auto-hide-external').isChecked()).toBe(true);
+      await page.locator('.fh-auto-hide-external').uncheck();
+      await waitUntil(async()=>await read()===false,'auto-hide disabled');
+    }finally{await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
+  });
+
   it('forwards group preference from the main Settings session to both live panels and restart', async()=>{
     const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-group-session-'));
     const fixture=makeProfile(8,{id:'group-fixture'});
