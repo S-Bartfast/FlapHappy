@@ -167,7 +167,7 @@ export function normalizeProfile(input: unknown): ParseResult {
     flaps,
     handle_count: numOrNull(r.handle_count),
     vs_min: normSpeed(r.vs_min),
-    transitions: transIn.map((row) => normSpeed(row)),
+    transitions: transIn.map((row) => ({ ...normSpeed(row), ...(isObj(row) && row.exclude_from_display === true ? { exclude_from_display:true } : {}) })),
     vne: normVne(r),
     weight_kg: { light: numOrNull(weights.light), heavy: numOrNull(weights.heavy) },
     ballast: {
@@ -228,7 +228,7 @@ export function exportProfileJson(p: Profile): string {
     flaps: p.flaps.map(flapToFile),
     handle_count: p.handle_count,
     vs_min: speedToFile(p.vs_min),
-    transitions: p.transitions.map(speedToFile),
+    transitions: p.transitions.map(t => ({ ...speedToFile(t), ...(t.exclude_from_display === true ? { exclude_from_display:true } : {}) })),
     vne_ms: p.vne === null ? null : knotsToMs(p.vne),
     weight_kg: { light: p.weight_kg.light === null ? null : Math.round(p.weight_kg.light * 100) / 100, heavy: p.weight_kg.heavy === null ? null : Math.round(p.weight_kg.heavy * 100) / 100 },
     ballast: p.ballast,

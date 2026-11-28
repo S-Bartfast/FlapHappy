@@ -5,7 +5,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { SHOT_DIR } from './browser-env';
 import { makeProfile, sample } from '../unit/helpers';
-import { exportProfileJson, createBlankProfile } from '../../core/profile';
+import { exportProfileJson, createBlankProfile, parseProfileJson } from '../../core/profile';
 import { installCockpitPanel } from '../../app-electron/panel-install';
 
 const root = path.resolve(__dirname, '../..');
@@ -178,9 +178,115 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
     }finally{await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
   });
 
+  it('forwards group preference from the main Settings session to both live panels and restart', async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-group-session-'));
+    const fixture=makeProfile(8,{id:'group-fixture'});
+    fixture.flaps.forEach((r,i)=>r.label=['L','6','5','N','4','3','2','1'][i]);for(const i of [0,1,4])fixture.transitions[i]={no_ballast_kt:null,max_ballast_kt:null,exclude_from_display:true};
+    fs.mkdirSync(path.join(ud,'profiles'));fs.writeFileSync(path.join(ud,'profiles',fixture.id+'.json'),exportProfileJson(fixture));
+    fs.writeFileSync(path.join(ud,'settings.json'),JSON.stringify({schema:'flaphappy.settings/1',last_profile_id:fixture.id,active_by_title:{'Simulated glider':fixture.id}}));
+    let session=await launch(ud);let browser:import('playwright-core').Browser|undefined;
+    try{
+      let {app,page}=session;
+      let external=await openExternal(app,page);
+      const {chromium}=await import('playwright-core');const {chromePath}=await import('./browser-env');
+      browser=await chromium.launch({executablePath:chromePath(),args:['--no-sandbox']});const cockpit=await browser.newPage();await cockpit.goto(panelUrl+'/panel.html');
+      const sim=async(patch:Record<string,unknown>)=>page.evaluate(value=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,value);sim.tick(0);},patch);
+      await sim({flapCount:8,flapIndex:1,totalWeightKg:400,iasKt:80});
+      const hosts=[external,cockpit];
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-cell.current')!==null);
+      expect((await getFeed()).groupHiddenFlapLabels).toBe(false);
+      await page.click('.fh-main-settings');await page.waitForSelector('.fh-group-hidden-labels');
+
+      await page.locator('.fh-group-hidden-labels').locator('..').click();
+
+      await waitUntil(async()=> (await getFeed()).groupHiddenFlapLabels===true,'group preference');
+      for(const host of hosts){await host.waitForFunction(()=>document.querySelector('.fh-cell.current')?.textContent==='L-6-5');expect(await host.locator('.fh-badge').textContent()).toBe('6');}
+      await page.locator('.fh-group-hidden-labels').locator('..').click();await waitUntil(async()=> (await getFeed()).groupHiddenFlapLabels===false);
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-cell.current')?.textContent==='5');
+      await page.locator('.fh-group-hidden-labels').locator('..').click();await waitUntil(async()=> (await getFeed()).groupHiddenFlapLabels===true);
+      await page.locator('.fh-simple-flap').locator('..').click();
+      await sim({iasKt:80});
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector<HTMLElement>('.fh-simple-actual')?.textContent==='6'&&document.querySelector('.fh-simple-arrow.on.faster')!==null&&Array.from(document.querySelectorAll<HTMLElement>('.fh-simple-pill')).some(e=>e.offsetHeight>0&&e.textContent==='N'));
+      await sim({iasKt:30});
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector<HTMLElement>('.fh-simple-actual')?.textContent==='6'&&document.querySelectorAll('.fh-simple-arrow.on').length===0);
+      await sim({flapIndex:3,iasKt:30});
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-simple-arrow.on.slower')!==null&&Array.from(document.querySelectorAll<HTMLElement>('.fh-simple-pill')).some(e=>e.offsetHeight>0&&e.textContent==='L-6-5'));
+      await page.locator('.fh-group-hidden-labels').locator('..').click();
+      for(const host of hosts)await host.waitForFunction(()=>Array.from(document.querySelectorAll<HTMLElement>('.fh-simple-pill')).some(e=>e.offsetHeight>0&&e.textContent==='5'));
+      await page.locator('.fh-group-hidden-labels').locator('..').click();
+      await page.locator('.fh-simple-flap').locator('..').click();
+      await page.click('.fh-main-settings');
+      await app.close();session=await launch(ud);({app,page}=session);
+      expect((await getFeed()).groupHiddenFlapLabels).toBe(true);
+      await page.click('.fh-main-settings');expect(await page.locator('.fh-group-hidden-labels').isChecked()).toBe(true);
+    }finally{await browser?.close();await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
+  });
+
+  it('edits inline divider switches, retains hidden values and reloads saved/null transitions', async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'fh-divider-switch-'));
+    const fixture=makeProfile(4,{id:'divider-fixture'});
+    fixture.transitions[1]={no_ballast_kt:null,max_ballast_kt:null,exclude_from_display:true};
+    const profileFile=path.join(ud,'profiles',fixture.id+'.json');
+    fs.mkdirSync(path.dirname(profileFile));fs.writeFileSync(profileFile,exportProfileJson(fixture));
+    fs.writeFileSync(path.join(ud,'settings.json'),JSON.stringify({schema:'flaphappy.settings/1',last_profile_id:fixture.id,active_by_title:{'Simulated glider':fixture.id}}));
+    let session=await launch(ud);
+    try{
+      let {app,page}=session;
+      await page.click('.fh-main-settings');
+      const first=()=>page.locator('.fh-trow').nth(0), second=()=>page.locator('.fh-trow').nth(1);
+      const light=()=>first().locator('[data-path="transitions[0].no_ballast_kt"]'), heavy=()=>first().locator('[data-path="transitions[0].max_ballast_kt"]');
+      await first().getByRole('switch',{name:'Show divider Transition 1 -> 2'}).waitFor();
+      expect(await first().getByRole('switch').isChecked()).toBe(true);expect(await second().getByRole('switch').isChecked()).toBe(false);
+      expect(await page.locator('.fh-group-hidden-labels').isChecked()).toBe(false);
+      await light().fill('54');await heavy().fill('68');
+      const toggle=first().getByRole('switch');await toggle.focus();await toggle.press('Space');
+      expect(await toggle.isChecked()).toBe(false);expect(await light().isVisible()).toBe(false);expect(await heavy().isDisabled()).toBe(true);
+      expect(await toggle.evaluate(el=>document.activeElement===el)).toBe(true);
+      await toggle.press('Tab');expect(await page.evaluate(()=>document.activeElement?.getAttribute('data-path'))).toBe('flaps[1].label');
+      await first().locator('.fh-transition-toggle').click();
+      expect(await light().inputValue()).toBe('54');expect(await heavy().inputValue()).toBe('68');
+      expect(await light().isEnabled()).toBe(true);
+      await second().locator('.fh-transition-toggle').click();
+      expect(await second().locator('.fh-speed:visible').count()).toBe(2);
+      expect(await second().locator('.fh-speed').first().inputValue()).toBe('');
+      expect(await page.locator('.fh-validhead.err').textContent()).toContain('Not applied');
+      await second().locator('.fh-transition-toggle').click();
+      expect(await page.locator('.fh-validhead.err').count()).toBe(0);
+      await first().locator('.fh-transition-toggle').click();
+      expect((await getFeed()).profile.transitions[0].exclude_from_display).not.toBe(true);
+      await page.click('.fh-settings .fh-save');await page.waitForFunction(()=>document.querySelector('.fh-savestate')?.textContent==='Saved and applied');
+      const saved=parseProfileJson(fs.readFileSync(profileFile,'utf8')).profile!;
+      expect(saved.transitions[0].exclude_from_display).toBe(true);expect(saved.transitions[0].no_ballast_kt).toBeCloseTo(54,6);expect(saved.transitions[0].max_ballast_kt).toBeCloseTo(68,6);
+      expect(saved.transitions[1]).toEqual({no_ballast_kt:null,max_ballast_kt:null,exclude_from_display:true});
+      expect(saved.flaps).toEqual(fixture.flaps);expect(saved.transitions[2]).toEqual(fixture.transitions[2]);
+      expect((await getFeed()).profile.transitions[0].exclude_from_display).toBe(true);
+      expect((await getFeed()).groupHiddenFlapLabels).toBe(false);
+      const external=await openExternal(app,page);
+      await page.evaluate(()=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,{totalWeightKg:400,flapCount:4,flapIndex:1,iasKt:70});sim.tick(0);});
+      await external.waitForFunction(()=>document.querySelector('.fh-cell.current')?.textContent==='3'&&document.querySelector('.fh-badge')?.textContent==='2');
+      expect(await external.locator('.fh-cell').allTextContents()).toEqual(['3','4']);
+      await app.close();session=await launch(ud);({app,page}=session);
+      await page.click('.fh-main-settings');await first().getByRole('switch').waitFor();
+      expect(await first().getByRole('switch').isChecked()).toBe(false);expect(await first().locator('.fh-speed:visible').count()).toBe(0);
+      await first().locator('.fh-transition-toggle').click();
+      expect(await light().inputValue()).toBe('54');expect(await heavy().inputValue()).toBe('68');
+      expect(await second().getByRole('switch').isChecked()).toBe(false);
+      await second().locator('.fh-transition-toggle').click();
+      expect(await second().locator('.fh-speed').first().inputValue()).toBe('');
+      await page.click('.fh-settings .fh-save');await page.waitForFunction(()=>document.querySelector('.fh-savestate')?.textContent?.startsWith('Saved as incomplete'));
+      const incomplete=parseProfileJson(fs.readFileSync(profileFile,'utf8')).profile!;
+      expect(incomplete.transitions[1].exclude_from_display).not.toBe(true);expect(incomplete.transitions[1].no_ballast_kt).toBeNull();
+      expect((await getFeed()).profile.transitions[1].exclude_from_display).toBe(true);
+    }finally{await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
+  });
+
   it('forwards highlight preference from the main Settings session to both live panels and restart', async()=>{
     const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-highlight-session-'));
     const fixture=makeProfile(3,{id:'highlight-fixture'});
+    fixture.flaps.forEach(row => { row.handle_index! += 1; });
+    fixture.flaps.unshift({label:'L',handle_index:0});
+    fixture.transitions.unshift({no_ballast_kt:null,max_ballast_kt:null,exclude_from_display:true});
+    fixture.handle_count=4;
 
     fs.mkdirSync(path.join(ud,'profiles'));fs.writeFileSync(path.join(ud,'profiles',fixture.id+'.json'),exportProfileJson(fixture));
     fs.writeFileSync(path.join(ud,'settings.json'),JSON.stringify({schema:'flaphappy.settings/1',last_profile_id:fixture.id,active_by_title:{'Simulated glider':fixture.id}}));
@@ -191,7 +297,7 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       const {chromium}=await import('playwright-core');const {chromePath}=await import('./browser-env');
       browser=await chromium.launch({executablePath:chromePath(),args:['--no-sandbox']});const cockpit=await browser.newPage();await cockpit.goto(panelUrl+'/panel.html');
       const sim=async(patch:Record<string,unknown>)=>page.evaluate(value=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,value);sim.tick(0);},patch);
-      await sim({flapCount:3,flapIndex:1,totalWeightKg:400,iasKt:55});
+      await sim({flapCount:4,flapIndex:2,totalWeightKg:400,iasKt:55});
       const hosts=[external,cockpit];
       for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-cell.current')!==null);
       expect((await getFeed()).highlightRecommended).toBe(false);
@@ -212,6 +318,8 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
         expect(await host.locator('.fh-cell.current').textContent()).toBe('2');
       }
       await sim({iasKt:0});for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-cell.recommended')?.textContent==='1');
+      await page.locator('.fh-group-hidden-labels').locator('..').click();
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-cell.recommended')?.textContent==='L-1'&&document.querySelector('.fh-cell.current')?.textContent==='2');
       await page.click('.fh-main-settings');
       await app.close();session=await launch(ud);({app,page}=session);
       expect((await getFeed()).highlightRecommended).toBe(true);
