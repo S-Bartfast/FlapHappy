@@ -34,6 +34,9 @@ Settings. Closing the main window exits the app and closes the external panel to
 A second launch (or `--show`) restores the existing main window; `--quit` exits the session.
 The previous experimental windowless launch flag is no longer a windowless mode.
 
+### Auto-hide in external views (optional)
+
+In Settings → Window and app, enable **Auto-hide from external views (in-sim panel only)**. It defaults off. Reinstall the cockpit panel from Settings to update an older installed wrapper. The panel stays loaded and becomes visible again in cockpit view. The desktop display is unaffected. The implementation recognizes the SDK's named chase, fixed, environment, showcase and drone states; ambiguous/unknown values remain visible. The [MSFS 2024 Camera Variables documentation](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simvars/camera-variables/) inconsistently describes value 9, so it is not used as proof of an external view. Live MSFS and VR validation is still needed.
 ### First use
 1. Click **Settings and profiles** in the main window. The same button becomes **Close settings**.
    Only one **Save** button is shown; closing the editor retains an unsaved profile draft for later saving.
@@ -134,6 +137,8 @@ Coherent-safe rules, enforced by `npm run lint:coherent` and by compiling the re
 ### Profiles in brief
 A profile has N flap rows (any N from 0 up; each row: label, a sim index you type in) and exactly N-1 transitions, plus Vs and Vne. Saved speeds are metres per second to two decimal places; the display converts them to whole kt or km/h. With both anchors supplied, the read-only weight indicator interpolates stall and transition speeds between the explicit Light and Heavy loaded weights. Weights outside this interval clamp only the interpolation; absent or stale telemetry leaves the ribbon unavailable in this mode. If either anchor is blank, the manual ballast slider instead uses the original No/Max Ballast speed columns and saved per-profile position, independent of total-weight telemetry. Existing user profiles retain their speed columns and manual fallback; no reference weights are guessed for them. Only the canonical weight_kg pair is used; obsolete ballast.auto mass_no_ballast_kg and mass_max_ballast_kg keys are ignored and omitted on re-save. VNE is one speed, saved as `vne_ms`. Validation (inline, with a summary box) requires strictly ascending speeds at both weight endpoints; buckets narrower than 4 kt warn, narrower than 2 kt are errors. The display shows an error/incomplete message instead of misleading data when a profile is not valid.
 
+**Simple flap indicator (optional).** In Settings, enable Simple flap indicator to replace the IAS, flap ribbon and transition numbers with a large centered current flap and a directional recommendation: a filled triangle points left to a slower profile row or right to a faster one, with a centered amber label. No recommendation is shown if the current row is already correct, the IAS is above the applicable range or unavailable, or telemetry/profile/mapping is not valid. Valid in-flight IAS below the ribbon floor, including zero, still suggests the slowest available flap if needed. This uses the profile's ordered speed buckets and current ballast setting; it does not introduce a new speed table. It is off by default, persists locally, and is shared by the desktop and cockpit panel. The Flap transitions switch is disabled while Simple mode is selected but keeps its prior value; the Ballast and AGL bars remain independently configurable.
+
 ## Choices and deviations worth knowing
 - Schema ids are `flaphappy.profile/3` and `flaphappy.settings/1`. Files with another schema id are rejected. The optional `weight_kg` object stores `light` and `heavy` loaded masses in kg. Older app versions can read the existing speed data but do not preserve the new weight anchors if they re-save a profile.
 - Minimum window content width is 560 px, growing with the flap count (`N*64+256`), so very large N scales instead of getting unreadable.
@@ -155,10 +160,16 @@ Everything above runs and is tested without the sim. These need a real Windows m
 4. Sample rate and behaviour on pause, menus, loading and slew (the "Paused" / "No data" states).
 5. Always-on-top over MSFS in windowed, borderless and true fullscreen modes (the app uses the highest topmost level; exclusive fullscreen may still hide it).
 6. Packaging: the portable exe starts, SmartScreen behaviour, `%APPDATA%\FlapHappy` creation, file open/save dialogs, "Open profiles folder".
-7. Cockpit panel: Settings → Window and app → **Install cockpit panel**, then restart MSFS. In the cockpit (including VR) press Tab and open **Flap Happy**. The main application must be running; the external flight ribbon is optional.
+7. Cockpit panel: Settings → Window and app → **Enable in-sim panel**, then restart MSFS. In the cockpit (including VR) press Tab and open **Flap Happy**. The main application must be running; the external flight ribbon is optional.
 8. The `--record` trace from a real flight replays correctly with `--source=replay`.
 
 The visible main window and Settings controls adjust to the available width; narrower windows wrap controls instead of requiring horizontal scrolling.
+
+### In-sim panel installation management
+
+Settings → Window and app → In-sim panel: choose the detected MSFS 2024 Community folder or an existing custom add-ons library parent. Browse is available only for a custom destination. Selecting the detected Community folder directly normalizes to Default Community.
+
+Enable installs the verified bundled panel, disabling removes a verified physical install. An installed older package exposes Update and a Settings badge. Equal or newer versions are not overwritten. This is a bundled-version check, not a desktop release checker. Close MSFS before making changes. A custom package may be linked by MSFS Addons Linker; Flap Happy never creates or removes those links. Unlink before removing. Changing destination does not move the existing package; remove/unlink the old installation explicitly first. If a target is unfamiliar, damaged, duplicated or linked to another package, the app refuses to overwrite it. Updates stage on the destination volume outside Community and roll back on a failed swap.
 
 ### Responsive speed-trigger labels
 When **Flap transitions** is enabled, the whole-number speed labels occupy a single row where their measured text widths fit. Crowded labels alternate between two rows while remaining aligned with the real dividers. Extremely dense values remain available on the dividers rather than overlapping neighboring text. The IAS calculations and units are unchanged.

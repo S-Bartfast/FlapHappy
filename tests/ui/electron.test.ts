@@ -6,6 +6,7 @@ import * as path from 'path';
 import { SHOT_DIR } from './browser-env';
 import { makeProfile, sample } from '../unit/helpers';
 import { exportProfileJson, createBlankProfile } from '../../core/profile';
+import { installCockpitPanel } from '../../app-electron/panel-install';
 
 const root = path.resolve(__dirname, '../..');
 const electronBin = (() => {
@@ -18,8 +19,8 @@ const electronBin = (() => {
 })();
 const canRun = !!electronBin && fs.existsSync(path.join(root, 'dist/main.js')) && (process.platform === 'win32' || !!process.env.DISPLAY);
 
-async function launch(userData: string, extra: string[] = ['--source=simulated']): Promise<{ app: ElectronApplication; page: Page }> {
-  const app = await electron.launch({ executablePath: electronBin, args: [root, '--no-sandbox', `--user-data=${userData}`, ...extra], cwd: root });
+async function launch(userData: string, extra: string[] = ['--source=simulated'], env?: Record<string,string>): Promise<{ app: ElectronApplication; page: Page }> {
+  const app = await electron.launch({ executablePath: electronBin, args: [root, '--no-sandbox', `--user-data=${userData}`, ...extra], cwd: root, env });
   const page = await app.firstWindow();
   await page.waitForFunction(() => !!(window as any).__flapHappy && !!(window as any).__flapHappy.app.lastSample);
   return { app, page };
@@ -60,6 +61,123 @@ async function clickBallast(panel: Page, fraction: number) {
 }
 
 describe.skipIf(!canRun)('visible control window and optional external panel', () => {
+  it('forwards simple preference from the main Settings session to both live panels and restart', async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-simple-session-'));
+    const fixture=makeProfile(3,{id:'simple-fixture'});
+
+    fs.mkdirSync(path.join(ud,'profiles'));fs.writeFileSync(path.join(ud,'profiles',fixture.id+'.json'),exportProfileJson(fixture));
+    fs.writeFileSync(path.join(ud,'settings.json'),JSON.stringify({schema:'flaphappy.settings/1',last_profile_id:fixture.id,active_by_title:{'Simulated glider':fixture.id}}));
+    let session=await launch(ud);let browser:import('playwright-core').Browser|undefined;
+    try{
+      let {app,page}=session;
+      let external=await openExternal(app,page);
+      const {chromium}=await import('playwright-core');const {chromePath}=await import('./browser-env');
+      browser=await chromium.launch({executablePath:chromePath(),args:['--no-sandbox']});const cockpit=await browser.newPage();await cockpit.goto(panelUrl+'/panel.html');
+      const sim=async(patch:Record<string,unknown>)=>page.evaluate(value=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,value);sim.tick(0);},patch);
+      await sim({flapCount:3,flapIndex:1,totalWeightKg:400,iasKt:55});
+      const hosts=[external,cockpit];
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-cell.current')!==null);
+      expect((await getFeed()).simpleFlap).toBe(false);
+      await page.click('.fh-main-settings');await page.waitForSelector('.fh-simple-flap');
+      await page.locator('.fh-show-transitions').locator('..').click();
+      await page.locator('.fh-simple-flap').locator('..').click();
+      expect(await page.locator('.fh-show-transitions').isDisabled()).toBe(true);expect(await page.locator('.fh-show-transitions').isChecked()).toBe(true);
+      await waitUntil(async()=> (await getFeed()).simpleFlap===true,'simple preference');
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector<HTMLElement>('.fh-simple-actual')?.textContent==='2'&&document.querySelectorAll('.fh-simple-arrow.on').length===0);
+      await sim({iasKt:75});
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-simple-arrow.on.faster')!==null&&Array.from(document.querySelectorAll<HTMLElement>('.fh-simple-pill')).some(e=>e.offsetHeight>0&&e.textContent==='3'));
+      await sim({iasKt:0});
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-simple-arrow.on.slower')!==null);
+      await page.locator('.fh-simple-flap').locator('..').click();expect(await page.locator('.fh-show-transitions').isEnabled()).toBe(true);expect(await page.locator('.fh-show-transitions').isChecked()).toBe(true);
+      await page.locator('.fh-simple-flap').locator('..').click();
+      await page.click('.fh-main-settings');
+      await app.close();session=await launch(ud);({app,page}=session);
+      expect((await getFeed()).simpleFlap).toBe(true);
+      await page.click('.fh-main-settings');expect(await page.locator('.fh-simple-flap').isChecked()).toBe(true);
+    }finally{await browser?.close();await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
+
+  });
+
+  it('updates a custom 1.0.0 panel to the merged Auto-hide package and persists the destination on immediate native close',async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'fh-panel-destination-'));
+    const custom=path.join(ud,'custom-addons'), packages=path.join(ud,'packages'), community=path.join(packages,'Community2024');
+    const appData=path.join(ud,'fake-appdata'), localData=path.join(ud,'fake-localappdata');
+    const configDir=path.join(appData,'Microsoft Flight Simulator 2024');
+    for(const dir of [custom,community,configDir,localData])fs.mkdirSync(dir,{recursive:true});
+    fs.writeFileSync(path.join(configDir,'UserCfg.opt'),`InstalledPackagesPath "${packages}"\n`);
+    const env={...Object.fromEntries(Object.entries(process.env).filter((e):e is [string,string]=>e[1]!==undefined)),APPDATA:appData,LOCALAPPDATA:localData};
+    const bundle=path.join(root,'dist','panel','flaphappy-ingamepanel'), old=path.join(ud,'old-bundle');
+    const wrapper='html_ui/InGamePanels/FlapHappy/FlapHappy.js';
+    // With an archived old package supplied, exercise its real payload too;
+    // ordinary test runs use a synthetic previous-version installation.
+    fs.cpSync(process.env.FH_TEST_PREVIOUS_PANEL || bundle,old,{recursive:true});
+    const manifest=path.join(old,'manifest.json');
+    const oldManifest=JSON.parse(fs.readFileSync(manifest,'utf8'));oldManifest.package_version='1.0.0';
+    fs.writeFileSync(manifest,JSON.stringify(oldManifest));
+    if(!process.env.FH_TEST_PREVIOUS_PANEL)fs.writeFileSync(path.join(old,wrapper),'// previous toolbar wrapper\n');
+    const destination={kind:'custom' as const,customParent:custom};
+    expect(installCockpitPanel(old,destination,community,fs.renameSync,()=>false).ok).toBe(true);
+    const target=path.join(custom,'flaphappy-ingamepanel');
+    expect(JSON.parse(fs.readFileSync(path.join(target,'manifest.json'),'utf8')).package_version).toBe('1.0.0');
+    expect(fs.readFileSync(path.join(target,wrapper))).not.toEqual(fs.readFileSync(path.join(bundle,wrapper)));
+    let session=await launch(ud,['--source=simulated'],env);
+    try{
+      let {app,page}=session;
+      await app.evaluate(({dialog},target)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[target]});},custom);
+      await page.click('.fh-main-settings');await page.getByText('Window and app',{exact:true}).click();
+      await page.getByLabel('Panel destination').selectOption('custom');
+      const browse=page.getByRole('button',{name:'Browse',exact:true});await browse.waitFor({state:'visible'});await browse.click();
+      await page.waitForFunction(p=>(document.querySelector('[aria-label="Custom package parent"]') as HTMLInputElement)?.value===p,custom);
+      const process=app.process();await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Flap Happy')!.close());
+      await waitUntil(()=>process.exitCode!==null,'immediate native close');
+      expect(settingsOnDisk(ud).panel_destination).toEqual(destination);
+      session=await launch(ud,['--source=simulated'],env);({app,page}=session);
+      await page.click('.fh-main-settings');await page.getByText('Window and app',{exact:true}).click();
+      expect(await page.getByLabel('Panel destination').inputValue()).toBe('custom');
+      expect(await page.getByLabel('Custom package parent').inputValue()).toBe(custom);
+      const update=page.getByRole('button',{name:'Update',exact:true});await update.waitFor({state:'visible'});
+      expect(await page.locator('.fh-panel-install').textContent()).toContain('Installed version: 1.0.0');
+      expect(await page.locator('.fh-main-settings').getAttribute('class')).toContain('fh-panel-update');
+      await update.click();await update.waitFor({state:'hidden'});
+      await page.waitForFunction(()=>document.querySelector('.fh-panel-install')?.textContent?.includes('Up to date'));
+      const newVersion=JSON.parse(fs.readFileSync(path.join(bundle,'manifest.json'),'utf8')).package_version;
+      expect(newVersion).toBe('1.0.1');
+      expect(JSON.parse(fs.readFileSync(path.join(target,'manifest.json'),'utf8')).package_version).toBe(newVersion);
+      for(const file of [wrapper,'html_ui/InGamePanels/FlapHappy/FlapHappy.html','html_ui/InGamePanels/FlapHappy/FlapHappy.css','InGamePanels/FlapHappy.spb'])
+        expect(fs.readFileSync(path.join(target,file))).toEqual(fs.readFileSync(path.join(bundle,file)));
+      expect(await page.locator('.fh-main-settings').getAttribute('class')).not.toContain('fh-panel-update');
+      expect(await page.locator('.fh-auto-hide-external').count()).toBe(1);
+      expect(fs.readdirSync(community)).toEqual([]);
+      expect(fs.readdirSync(custom)).toEqual(['flaphappy-ingamepanel']);
+      expect(fs.readdirSync(ud).some(n=>n.startsWith('.flaphappy-stage-'))).toBe(false);
+    }finally{await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
+  });
+
+  it('persists Auto-hide preference across restart and publishes it without hiding the external panel', async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-auto-hide-'));let session=await launch(ud);
+    try {
+      let {app,page}=session; const read=async()=> (await (await fetch(panelUrl+'/panel-settings')).json()).autoHideExternal;
+      const external=await openExternal(app,page);
+      expect(await read()).toBe(false);
+      await page.click('.fh-main-settings');await page.getByText('Window and app',{exact:true}).click();
+      const check=page.locator('.fh-auto-hide-external');
+      expect(await check.isChecked()).toBe(false);
+      await check.check();
+      await waitUntil(async()=>await read()===true,'auto-hide endpoint');
+      expect((await getFeed()).autoHideExternal).toBe(true);
+      expect(await external.locator('.fh-fit').isVisible()).toBe(true);
+      const process=app.process();await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Flap Happy')!.close());
+      await waitUntil(()=>process.exitCode!==null,'close flush');
+      session=await launch(ud);({app,page}=session);
+      expect(await read()).toBe(true);
+      const again=await openExternal(app,page);expect(await again.locator('.fh-fit').isVisible()).toBe(true);
+      await page.click('.fh-main-settings');await page.getByText('Window and app',{exact:true}).click();
+      expect(await page.locator('.fh-auto-hide-external').isChecked()).toBe(true);
+      await page.locator('.fh-auto-hide-external').uncheck();
+      await waitUntil(async()=>await read()===false,'auto-hide disabled');
+    }finally{await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
+  });
+
   it('starts visibly with no ribbon, opens/closes/reopens the common panel and keeps feeding while minimized', async () => {
     const ud = fs.mkdtempSync(path.join(os.tmpdir(), 'flaphappy-main-window-'));
     const fixture = makeProfile(2, { id: 'panel-fixture' });

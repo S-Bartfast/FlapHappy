@@ -115,6 +115,7 @@ export class App {
       }
     }
     this.buildUi();
+    void this.refreshPanelUpdateIndicator();
     this.installDrop();
 
     const mainBridge = this.deps.info.mainWindow ? window.flapHappyBridge : undefined;
@@ -138,6 +139,17 @@ export class App {
     }
     setInterval(() => this.renderAll(), 500);
     if (!this.profile && (!this.deps.info.mainWindow || this.sessionReady)) this.openSettings();
+  }
+
+  setPanelUpdateIndicator(status: import('../core/panel-install').PanelInstallStatus): void {
+    const pending=status.installed&&status.action==='Update';
+    for(const button of this.deps.root.querySelectorAll<HTMLElement>('.fh-cog,.fh-main-settings')){
+      button.classList.toggle('fh-panel-update',pending);
+      button.title=pending?'Settings — panel update available':'Settings';
+    }
+  }
+  async refreshPanelUpdateIndicator(): Promise<void> {
+    try{const status=await this.host.panelStatus?.(this.settings.panel_destination);if(status)this.setPanelUpdateIndicator(status);}catch{/* no verified update */}
   }
 
   // ---------------------------------------------------------------- UI shell
@@ -497,8 +509,19 @@ export class App {
     this.renderAll();
   }
 
+  setAutoHideExternal(on: boolean): void {
+    this.settings.ui.auto_hide_external = on;
+    this.persistSoon();
+  }
+
   setShowAgl(on: boolean): void {
     this.settings.ui.show_agl = on;
+    this.persistSoon();
+    this.renderAll();
+  }
+
+  setSimpleFlap(on: boolean): void {
+    this.settings.ui.simple_flap = on;
     this.persistSoon();
     this.renderAll();
   }
@@ -622,7 +645,7 @@ export class App {
     const model = this.buildModelFor(this.profile, this.validation);
     this.lastModel = model;
     this.slider?.render(this.profile, model.weight, this.ballast, this.settings.weight_unit);
-    this.strip?.render(model, { profile: this.profile, zoom: this.settings.ui.zoom, showBallast: this.settings.ui.show_ballast, showAgl: this.settings.ui.show_agl, showTransitions: this.settings.ui.show_transitions, showWind: this.settings.ui.show_wind, barShading: this.settings.ui.bar_shading });
+    this.strip?.render(model, { profile: this.profile, zoom: this.settings.ui.zoom, showBallast: this.settings.ui.show_ballast, showAgl: this.settings.ui.show_agl, simpleFlap: this.settings.ui.simple_flap, showTransitions: this.settings.ui.show_transitions, showWind: this.settings.ui.show_wind, barShading: this.settings.ui.bar_shading });
     setText(this.titleEl, this.profile ? profileLabel(this.profile.id) : 'Flap Happy');
     const bits: string[] = [];
     if (model.statusText) bits.push(model.statusText);

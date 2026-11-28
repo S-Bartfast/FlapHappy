@@ -1,3 +1,4 @@
+import type { PanelDestination } from './panel-install';
 export const PROFILE_SCHEMA = 'flaphappy.profile/3';
 export const SETTINGS_SCHEMA = 'flaphappy.settings/1';
 
@@ -114,6 +115,10 @@ export interface Settings {
     show_ballast: boolean;
     /** The height bar on the display. */
     show_agl: boolean;
+    /** Optional large current/suggested flap indicator instead of IAS and flap rows. */
+    simple_flap: boolean;
+    /** Hide only the in-sim toolbar panel in recognized external camera views. */
+    auto_hide_external: boolean;
     /** The transition speeds under the flap row. */
     show_transitions: boolean;
     /** The wind speed drawn on the AGL bar. */
@@ -122,6 +127,7 @@ export interface Settings {
     bar_shading: boolean;
   };
   /** Original ribbon bounds retained for the optional external panel. */
+  panel_destination: PanelDestination;
   window: WindowBounds | null;
   main_window: WindowBounds | null;
 }

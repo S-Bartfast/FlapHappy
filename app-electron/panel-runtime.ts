@@ -102,7 +102,7 @@ export class PanelRuntime {
   private applyDisplayPreferences(): void {
     const s = this.preferences;
     this.state = { ...this.state, units: s.units, weightUnit: s.weight_unit, height: s.height, agl: s.agl, zoom: s.ui.zoom,
-      showBallast: s.ui.show_ballast, showAgl: s.ui.show_agl, showTransitions: s.ui.show_transitions,
+      showBallast: s.ui.show_ballast, showAgl: s.ui.show_agl, simpleFlap: s.ui.simple_flap, autoHideExternal: s.ui.auto_hide_external, showTransitions: s.ui.show_transitions,
       showWind: s.ui.show_wind, barShading: s.ui.bar_shading };
   }
 
@@ -112,6 +112,7 @@ export class PanelRuntime {
     // an explicit command, never an older renderer snapshot.
     const settings = normalizeSettings({
       ...previous, units: incoming.units, height: incoming.height, weight_unit: incoming.weight_unit, agl: incoming.agl, ui: incoming.ui,
+      panel_destination: incoming.panel_destination,
     });
     settings.ballast_by_profile = previous.ballast_by_profile;
     settings.window = previous.window;

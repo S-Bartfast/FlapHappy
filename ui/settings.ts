@@ -14,6 +14,7 @@ import { deriveLink } from '../core/display-model';
 import { canSaveWeightMode, liveWeight, profileForWeightMode, weightModeForProfile, type WeightMode } from '../core/weight';
 import { clear, fmtNum, h, numberOrNull, setText, toggleClass } from './dom';
 import type { App } from './app';
+import type { PanelInstallStatus,PanelInstallResult,PanelDestination } from '../core/panel-install';
 
 export interface ImportDraft {
   name: string;
@@ -229,8 +230,8 @@ export class SettingsView {
     const u = app.settings.ui;
     const sw = (cls: string, on: boolean, label: string, set: (v: boolean) => void, enabled = true) =>
       h('label', { class: 'fh-slide' + (enabled ? '' : ' off') }, h('input', { type: 'checkbox', class: cls, 'aria-label': label, checked: on, disabled: !enabled, onchange: (e: Event) => set((e.target as HTMLInputElement).checked) }), h('span', { class: 'fh-slidetrack' }, h('span', { class: 'fh-slideknob' })));
-    const row = (label: string, control: HTMLElement) => h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, label), control);
-    const toggles = h('div', { class: 'fh-toggles' }, h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'Speed'), h('span', { class: 'fh-units' }, unitBtn('kt', 'kt'), unitBtn('kmh', 'km/h'))), h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'Altitude'), h('span', { class: 'fh-units fh-height' }, heightBtn('ft', 'ft'), heightBtn('m', 'm'))), row('Weight', h('span', { class: 'fh-units' }, weightBtn('kg'), weightBtn('lb'))), row('Flap transitions', sw('fh-show-transitions', u.show_transitions, 'Flap transitions', (v) => app.setShowTransitions(v))), row('Weight / ballast bar', sw('fh-show-ballast', u.show_ballast, 'Weight / ballast bar', (v) => app.setShowBallast(v))), h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'AGL bar'), sw('fh-show-agl', u.show_agl, 'AGL bar', (v) => { app.setShowAgl(v); this.renderProfileBar(); }), h('span', { class: 'fh-unitlab fh-beside' + (u.show_agl ? '' : ' off') }, 'Wind speed'), sw('fh-show-wind', u.show_wind, 'Wind speed', (v) => app.setShowWind(v), u.show_agl)));
+    const row = (label: string, control: HTMLElement, enabled = true) => h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' + (enabled ? '' : ' off') }, label), control);
+    const toggles = h('div', { class: 'fh-toggles' }, h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'Speed'), h('span', { class: 'fh-units' }, unitBtn('kt', 'kt'), unitBtn('kmh', 'km/h'))), h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'Altitude'), h('span', { class: 'fh-units fh-height' }, heightBtn('ft', 'ft'), heightBtn('m', 'm'))), row('Weight', h('span', { class: 'fh-units' }, weightBtn('kg'), weightBtn('lb'))), row('Simple flap indicator', sw('fh-simple-flap', u.simple_flap, 'Simple flap indicator', (v) => { const focused = document.activeElement?.classList.contains('fh-simple-flap'); app.setSimpleFlap(v); this.renderProfileBar(); if (focused) this.profileBar.querySelector<HTMLInputElement>('.fh-simple-flap')?.focus(); })), row('Flap transitions', sw('fh-show-transitions', u.show_transitions, 'Flap transitions', (v) => app.setShowTransitions(v), !u.simple_flap), !u.simple_flap), row('Weight / ballast bar', sw('fh-show-ballast', u.show_ballast, 'Weight / ballast bar', (v) => app.setShowBallast(v))), h('div', { class: 'fh-optrow' }, h('span', { class: 'fh-unitlab' }, 'AGL bar'), sw('fh-show-agl', u.show_agl, 'AGL bar', (v) => { app.setShowAgl(v); this.renderProfileBar(); }), h('span', { class: 'fh-unitlab fh-beside' + (u.show_agl ? '' : ' off') }, 'Wind speed'), sw('fh-show-wind', u.show_wind, 'Wind speed', (v) => app.setShowWind(v), u.show_agl)));
     this.saveAsBtn = files ? h('button', { class: 'fh-btn fh-saveas', type: 'button', disabled: !canSaveWeightMode(this.draft, this.weightMode), onclick: () => void this.saveAs() }, 'Save As...') as HTMLButtonElement : null;
     const profile = h('div', { class: 'fh-prow' }, h('label', null, 'Profile'), shown, files ? h('button', { class: 'fh-btn fh-open', type: 'button', onclick: () => void this.openFile() }, 'Open...') : null, this.saveAsBtn, app.host.capabilities.openFolder ? h('button', { class: 'fh-btn', type: 'button', onclick: () => app.host.openProfilesFolder() }, 'Open profiles folder') : null);
     this.profileBar.appendChild(toggles);
@@ -583,11 +584,60 @@ export class SettingsView {
     rows.push(h('div', { class: 'fh-arow' }, h('label', null, 'Zoom'), h('input', { type: 'range', min: '0.5', max: '2', step: '0.1', value: String(u.zoom), oninput: (e: Event) => app.setZoom(Number((e.target as HTMLInputElement).value)) })));
     rows.push(h('div', { class: 'fh-arow' }, h('label', { class: 'fh-check' }, h('input', { type: 'checkbox', class: 'fh-demo', checked: u.demo_mode, onchange: (e: Event) => app.setDemoMode((e.target as HTMLInputElement).checked) }), ' Demo mode: use simulated data instead of the sim')));
     if (caps.files) {
-      const panelNote = h('div', { class: 'fh-hint' }, 'In VR, press Tab and open Flap Happy. The main application must be running; the external panel is optional.');
-      rows.push(h('div', { class: 'fh-arow' }, h('button', { class: 'fh-btn', type: 'button', onclick: () => void app.host.installCockpitPanel().then((msg) => setText(panelNote, msg)) }, 'Install cockpit panel'), panelNote));
+      rows.push(h('div',{class:'fh-arow'},h('label',{class:'fh-check'},h('input',{type:'checkbox',class:'fh-auto-hide-external',checked:u.auto_hide_external,onchange:(e:Event)=>app.setAutoHideExternal((e.target as HTMLInputElement).checked)}),' Auto-hide from external views (in-sim panel only)')));
     }
+    if (app.host.panelStatus) rows.push(this.panelInstallBox());
     rows.push(h('div', { class: 'fh-hint' }, 'Version ' + app.info.version + ' | data source: ' + (app.usingSim ? 'simulated' : app.info.source)));
     this.appBox.appendChild(h('details', { class: 'fh-details' }, h('summary', null, 'Window and app'), ...rows));
+  }
+
+  private panelInstallBox(): HTMLElement {
+    const app=this.app, host=app.host;
+    let busy=false, status:PanelInstallStatus|null=null, generation=0;
+    const choice=()=>app.settings.panel_destination;
+    const selector=h('select',{'aria-label':'Panel destination'},h('option',{value:'community'},'Default Community'),h('option',{value:'custom'},'Custom folder')) as HTMLSelectElement;
+    const target=h('input',{type:'text',readonly:true,'aria-label':'Custom package parent',class:'fh-panel-path'}) as HTMLInputElement;
+    const browse=h('button',{type:'button',class:'fh-btn'},'Browse') as HTMLButtonElement;
+    const custom=h('div',{class:'fh-arow'},target,browse);
+    const enabled=h('input',{type:'checkbox','aria-label':'Enable in-sim panel'}) as HTMLInputElement;
+    const version=h('div',{class:'fh-hint'});
+    const location=h('div',{class:'fh-hint'});
+    const note=h('div',{class:'fh-hint',role:'status'});
+    const update=h('button',{type:'button',class:'fh-btn'},'Update') as HTMLButtonElement;
+    function paint(message?:string){
+      selector.value=choice().kind;selector.disabled=busy;custom.hidden=choice().kind!=='custom';
+      custom.style.display=custom.hidden?'none':'';
+      target.value=choice().customParent??'';browse.disabled=busy;
+      enabled.checked=status?.installed??false;enabled.disabled=busy||!status||!(status.installed?status.canRemove:status.action==='Install');
+      update.hidden=status?.action!=='Update'||!status.installed;update.disabled=busy;
+      location.hidden=choice().kind!=='community';setText(location,status?.community?'Community: '+status.community:'Community not detected');
+      setText(version,status?.installedVersion?'Installed version: '+status.installedVersion:'Installed version: —');
+      setText(note,message??status?.message??'Checking installation…');
+    }
+    function apply(next:PanelInstallStatus){
+      status=next;
+      if(JSON.stringify(choice())!==JSON.stringify(next.destination)){app.settings.panel_destination=next.destination;app.persistSoon();}
+      app.setPanelUpdateIndicator(next);
+    }
+    async function refresh(next?:PanelDestination){
+      const id=++generation;
+      if(next){app.settings.panel_destination=next;app.persistSoon();}
+      busy=true;status=null;paint();
+      try{const result=await host.panelStatus!(choice());if(id===generation)apply(result);}
+      catch(e){if(id===generation){busy=false;paint(String(e));return;}}
+      if(id===generation){busy=false;paint();}
+    }
+    async function mutate(action:()=>Promise<PanelInstallResult>){
+      if(busy)return;busy=true;paint();
+      try{const result=await action();apply(result.status);busy=false;paint(result.ok?undefined:result.message);}
+      catch(e){busy=false;paint(String(e));}
+    }
+    selector.onchange=()=>void refresh({...choice(),kind:selector.value==='custom'?'custom':'community'});
+    browse.onclick=async()=>{if(busy)return;busy=true;paint();try{const selected=await host.browsePanelParent!();busy=false;if(selected)await refresh({kind:'custom',customParent:selected});else paint();}catch(e){busy=false;paint(String(e));}};
+    enabled.onchange=()=>{const value=enabled.checked;void mutate(()=>host.setPanelInstalled!(choice(),value));};
+    update.onclick=()=>void mutate(()=>host.updatePanel!(choice()));
+    const box=h('div',{class:'fh-panel-install'},h('strong',null,'In-sim panel'),h('div',{class:'fh-arow'},h('label',{class:'fh-check'},enabled,' Enable in-sim panel')),h('div',{class:'fh-arow'},h('label',null,'Install destination'),selector),custom,location,version,h('div',{class:'fh-arow'},update,note));
+    void refresh();return box;
   }
 
   // ------------------------------------------------------------- File actions
