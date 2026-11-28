@@ -87,6 +87,8 @@ describe('display layout: bar, ticks and flap cells share N columns', () => {
   it('weight re-aligns the ticks (labels follow actual weight) and they stay aligned with the cells', async () => {
     const page = await env.newPage('?seed=demo');
     await load(page, makeProfile(6));
+    await clickBallast(page, 0);
+    await settle(page);
     const labels = () => page.$$eval('.fh-display .fh-ticktext', (els) => els.map((e) => e.textContent));
     expect(await labels()).toEqual(['40', '52', '64', '76', '88', '100', '146']);
     await clickBallast(page, 1);
@@ -103,6 +105,8 @@ describe('display layout: bar, ticks and flap cells share N columns', () => {
     p.transitions[0].no_ballast_kt = 44;
     p.transitions[0].max_ballast_kt = 56;
     await load(page, p);
+    await clickBallast(page, 0);
+    await settle(page);
     const g = await geometry(page);
     for (let i = 0; i < 4; i++) expect(Math.abs(g.ticks[i] - g.wraps[i].l)).toBeLessThan(1.5);
     // Buckets 40-44-64-76-114 kt: widths are 4/74, 20/74, 12/74, 38/74 of the bar.
@@ -132,6 +136,8 @@ describe('current-flap highlight and IAS marker', () => {
     for (const n of [2, 6]) {
       const page = await env.newPage('?seed=demo');
       await load(page, makeProfile(n));
+      await clickBallast(page, 0);
+      await settle(page);
       await page.evaluate(() => { (window as any).__flapHappy.app.profile.marker_smoothing_ms = 0; });
       for (let k = 1; k < n; k++) {
         await sim(page, { iasKt: 40 + 12 * k });
@@ -146,6 +152,8 @@ describe('current-flap highlight and IAS marker', () => {
   it('marker is not tied to the highlight: lever on flap 2 while IAS sits in column 5', async () => {
     const page = await env.newPage('?seed=demo');
     await load(page, makeProfile(6));
+    await clickBallast(page, 0);
+    await settle(page);
     await page.evaluate(() => { (window as any).__flapHappy.app.profile.marker_smoothing_ms = 0; });
     await sim(page, { flapIndex: 1, iasKt: 94 });
     await settle(page);
@@ -220,7 +228,7 @@ describe('states and the current-flap fallback chain (simulated feed)', () => {
     expect(await readoutClass('low')).toBe(true);
     await page.screenshot({ path: `${SHOT_DIR}/flaphappy-state-low.png` });
     await sim(page, { iasKt: 200 });
-    await settle(page, 700);
+    await page.waitForFunction(() => document.querySelector('.fh-display .fh-readout')?.classList.contains('fast'), null, { timeout: 3000 });
     expect(await readoutClass('low')).toBe(false);
     expect(await readoutClass('fast')).toBe(true);
     await sim(page, { iasKt: 80, onGround: true });
@@ -287,4 +295,18 @@ describe('read-only weight', () => {
     expect(await read()).toBe('-- kg');
     await page.close();
   });
+});
+
+
+it('manual legacy slider remains interactive and snapped after the live weight merge',async()=>{
+ const page=await env.newPage('?seed=demo');try{
+  const p=makeProfile(6);p.weight_kg={light:null,heavy:null};p.ballast.drag_snap=0.05;await load(page,p);
+  const read=()=>page.$eval('.fh-display .fh-sl-pct',e=>e.textContent);
+  let box=(await page.locator('.fh-ballast-row .fh-sl-track').boundingBox())!;
+  await page.mouse.click(box.x+box.width*0.5,box.y+box.height/2);expect(await read()).toBe('50%');
+  box=(await page.locator('.fh-ballast-row .fh-sl-track').boundingBox())!; await page.mouse.move(box.x+box.width*0.5,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width*0.75,box.y+box.height/2);await page.mouse.up();expect(await read()).toBe('75%');
+  box=(await page.locator('.fh-ballast-row .fh-sl-track').boundingBox())!; await page.mouse.click(box.x+1,box.y+box.height/2);expect(await read()).toBe('0%');
+  box=(await page.locator('.fh-ballast-row .fh-sl-track').boundingBox())!; await page.mouse.click(box.x+box.width-1,box.y+box.height/2);expect(await read()).toBe('100%');
+  await page.waitForTimeout(700);expect(await page.evaluate(async()=> (await (window as any).__flapHappy.app.store.getSettings()).ballast_by_profile['test-6'])).toBe(1);
+ }finally{await page.close();}
 });
