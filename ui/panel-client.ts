@@ -4,6 +4,7 @@ import { usesManualBallast } from '../core/weight';
 import { validateProfile } from '../core/validate';
 import { CurrentFlapResolver } from '../core/flapmap';
 import { buildDisplayModel, deriveLink } from '../core/display-model';
+import { smoothStep } from '../core/scale';
 import type { AglScale } from '../core/units';
 import { h, setText } from './dom';
 import { StripView } from './strip';
@@ -13,6 +14,7 @@ import { WeightControl } from './slider';
  * Display shown inside the sim. It reads the desktop app over localhost and does not keep its own profile.
  * XMLHttpRequest only: the in-sim browser has no fetch.
  */
+const POLL_MS = 100;
 const root = document.getElementById('app') as HTMLElement;
 const note = h('div', { class: 'fh-hint' }, 'Waiting for Flap Happy.');
 const slider = new WeightControl((f) => postBallast(f));
@@ -21,18 +23,36 @@ root.appendChild(note);
 root.appendChild(strip.el);
 
 let profileId = '';
+let aircraftTitle: string | null = null;
 let manualMode = false;
 let holdUntil = 0;
 let shownBallast = 0;
 const resolver = new CurrentFlapResolver();
+let smoothIas: number | null = null;
+let smoothAgl: number | null = null;
+let smoothAt = 0;
+
+function resetSmoothing(): void {
+  smoothIas = smoothAgl = null;
+  smoothAt = 0;
+}
+
+function smoothValue(previous: number | null, value: number | null, dt: number, tau: number): number | null {
+  return value !== null && isFinite(value) ? smoothStep(previous, value, dt, tau) : null;
+}
 
 function xhr(method: string, path: string, body: string | null, done: (status: number, text: string) => void): void {
   const req = new XMLHttpRequest();
   req.open(method, path, true);
   req.timeout = 1500;
-  req.onreadystatechange = () => {
-    if (req.readyState === 4) done(req.status, req.responseText || '');
+  let completed = false;
+  const finish = () => {
+    if (completed) return;
+    completed = true;
+    done(req.status, req.responseText || '');
   };
+  req.onreadystatechange = () => { if (req.readyState === 4) finish(); };
+  req.onerror = req.ontimeout = finish;
   if (body !== null) req.setRequestHeader('Content-Type', 'application/json');
   req.send(body);
 }
@@ -56,23 +76,38 @@ function paint(state: CockpitState): void {
   strip.el.style.display = '';
   const profile = state.profile as Profile;
   const changedProfile = profile.id !== profileId;
-  if (changedProfile) {
+  const nextTitle = state.sample?.aircraftTitle ?? null;
+  if (changedProfile || aircraftTitle !== nextTitle) {
+    aircraftTitle = nextTitle;
     profileId = profile.id;
+    shownBallast = -1;
+    holdUntil = 0;
     resolver.reset();
+    resetSmoothing();
   }
   const now = Date.now();
   const nextManual = usesManualBallast(profile);
   if (manualMode !== nextManual || changedProfile) holdUntil = 0;
   manualMode = nextManual;
   const f = manualMode && now < holdUntil ? shownBallast : state.ballast;
-  const validation = validateProfile(profile);
+  const count = state.sample?.connected && state.sample.flapCount !== null && state.sample.flapCount > 0 ? state.sample.flapCount : null;
+  const validation = validateProfile(profile, { liveHandleCount: count });
+  const link = deriveLink(state.sample, state.receivedAt, now);
+  if (link === 'live' && state.sample) {
+    const dt = smoothAt ? now - smoothAt : 0;
+    const tau = profile.marker_smoothing_ms;
+    smoothIas = smoothValue(smoothIas, state.sample.iasKt, dt, tau);
+    smoothAgl = smoothValue(smoothAgl, state.sample.aglFt, dt, tau);
+    smoothAt = now;
+  } else resetSmoothing();
   const model = buildDisplayModel({
     profile,
     validation,
     sample: state.sample,
-    link: deriveLink(state.sample, state.receivedAt, now),
+    link,
     manualBallast: f,
-    ias: state.sample ? state.sample.iasKt : null,
+    ias: smoothIas,
+    aglFt: smoothAgl,
     flap: resolver.resolve(profile, state.sample, now),
     units: state.units === 'kmh' ? 'kmh' : 'kt',
     height: state.height === 'm' ? 'm' : 'ft',
@@ -89,28 +124,51 @@ function aglFromState(state: CockpitState): AglScale | undefined {
   return agl;
 }
 
+let latest: CockpitState | null = null;
+
 function poll(): void {
   xhr('GET', '/api/state', null, (status, text) => {
+    let next: CockpitState | null = null;
     if (status === 200) {
       try {
-        paint(JSON.parse(text) as CockpitState);
+        next = JSON.parse(text) as CockpitState;
       } catch {
-        unavailable();
+        next = null;
       }
-    } else unavailable();
-    setTimeout(poll, 200);
+    }
+    if (next) latest = next;
+    else if (latest) {
+      latest = null;
+      unavailable();
+    }
+    setTimeout(poll, POLL_MS);
   });
+}
+
+/** Redraws between polls so the smoothed markers glide instead of stepping at the poll rate. */
+function frame(): void {
+  if (latest) paint(latest);
+  nextFrame(frame);
+}
+
+function nextFrame(fn: () => void): void {
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fn);
+  else setTimeout(fn, 33);
 }
 
 function unavailable(): void {
   setText(note, 'Waiting for Flap Happy.');
   profileId = '';
+  aircraftTitle = null;
+  shownBallast = -1;
   manualMode = false;
   holdUntil = 0;
   resolver.reset();
+  resetSmoothing();
   note.style.display = 'block';
   strip.el.style.display = 'none';
   slider.render(null, { kg: null, fraction: null, anchorsValid: false }, { f: 0, unconfirmed: false, restored: false });
 }
 unavailable();
 poll();
+nextFrame(frame);
