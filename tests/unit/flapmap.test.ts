@@ -46,6 +46,13 @@ describe('current flap resolution', () => {
     expect(f).toMatchObject({ status: 'row', rowIndex: 3, via: 'percent' });
   });
 
+  it('a near-whole index is rounded before the row lookup', () => {
+    const r = new CurrentFlapResolver();
+    expect(r.resolve(p6(), at(1.0000001), 0)).toMatchObject({ status: 'row', rowIndex: 4, label: '5', handleIndex: 1, via: 'index' });
+    expect(r.resolve(p6(), at(1.9999999), 0)).toMatchObject({ status: 'row', rowIndex: 3, handleIndex: 2, via: 'index' });
+    expect(r.resolve(p6(), at(6.9999999), 0)).toMatchObject({ status: 'unlisted', label: '#7', handleIndex: 7 });
+  });
+
   it('NaN index is treated as missing', () => {
     const f = new CurrentFlapResolver().resolve(p6(), at(4, { flapIndex: NaN }), 0);
     expect(f.via).toBe('percent');

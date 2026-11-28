@@ -69,7 +69,7 @@ export class CurrentFlapResolver {
     for (const src of order) {
       if (src === 'index') {
         if (isValidIndex(s.flapIndex, count)) {
-          result = lookupIndex(p, s.flapIndex);
+          result = lookupIndex(p, Math.round(s.flapIndex));
           if (result) result.via = 'index';
         }
       } else if (src === 'percent') {
