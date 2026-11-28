@@ -1,3 +1,4 @@
+import { normalizePanelDestination } from './panel-install';
 import { SETTINGS_SCHEMA, type Settings } from './types';
 import { defaultAglScale, feetToMetres, roundMetres, type SpeedUnit } from './units';
 import { clamp01 } from './profile';
@@ -13,6 +14,7 @@ export function defaultSettings(): Settings {
     height: 'ft',
     agl: defaultAglScale(),
     ui: { compact: true, always_on_top: false, opacity: 1, zoom: 1, demo_mode: false, external_panel_on_launch: false, show_ballast: true, show_agl: true, simple_flap: false, group_hidden_flap_labels: false, auto_hide_external: false, show_transitions: false, show_wind: true, bar_shading: true },
+    panel_destination: normalizePanelDestination(null),
     window: null,
     main_window: null,
   };
@@ -79,6 +81,7 @@ export function normalizeSettings(raw: unknown): Settings {
       show_wind: ui.show_wind !== false,
       bar_shading: ui.bar_shading !== false,
     },
+    panel_destination: normalizePanelDestination(r.panel_destination),
     window: bounds(r.window),
     main_window: bounds(r.main_window),
   };

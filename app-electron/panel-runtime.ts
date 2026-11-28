@@ -112,6 +112,7 @@ export class PanelRuntime {
     // an explicit command, never an older renderer snapshot.
     const settings = normalizeSettings({
       ...previous, units: incoming.units, height: incoming.height, weight_unit: incoming.weight_unit, agl: incoming.agl, ui: incoming.ui,
+      panel_destination: incoming.panel_destination,
     });
     settings.ballast_by_profile = previous.ballast_by_profile;
     settings.window = previous.window;

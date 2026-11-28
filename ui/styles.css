@@ -254,5 +254,12 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-settings .fh-wide{max-width:100%;min-width:0;}
 @media(max-width:420px){.fh-optrow .fh-unitlab{flex-basis:168px;width:168px;}.fh-settings .fh-arow>label:first-child{width:auto;flex:1 0 100%;}.fh-settings .fh-aglfield+.fh-aglfield{margin-left:0;}}
 
+.fh-panel-install { display:flex; flex-direction:column; border-top:1px solid #7776; margin-top:8px; padding-top:8px; }
+.fh-panel-install > * + * { margin-top:6px; }
+.fh-panel-install [hidden] { display:none !important; }
+.fh-panel-install .fh-panel-path { min-width:0; flex:1; }
+.fh-panel-update { position:relative; }
+.fh-panel-update::after { content:'!'; font:bold 11px sans-serif; color:#171717; background:#ffc557; position:absolute; right:-4px; top:-4px; border-radius:50%; width:15px; height:15px; line-height:15px; text-align:center; }
+
 .fh-badge.mapped { color:#fff; background:#275b82; }
 .fh-exclude-transition { margin-left:22px; font-size:12px; color:#afb9c9; }
