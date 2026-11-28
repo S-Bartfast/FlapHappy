@@ -61,6 +61,7 @@
     }
   ],
   "vne_ms": 78.71,
+  "weight_kg": { "light": 475, "heavy": 550 },
   "ballast": {
     "source": "manual",
     "default_fraction": 1,
@@ -74,8 +75,6 @@
         "total_mass",
         "payload"
       ],
-      "mass_no_ballast_kg": null,
-      "mass_max_ballast_kg": null,
       "payload_stations": []
     }
   },

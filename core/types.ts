@@ -42,6 +42,9 @@ export interface Profile {
   transitions: Speed[];
   /** Knots. Saved files store this as a single `vne_ms`, with no ballast split. */
   vne: number | null;
+  /** Loaded flying weights for the existing light/heavy speed columns (kg). */
+  weight_kg: { light: number | null; heavy: number | null };
+  /** Manual ballast settings used only when either loaded-weight anchor is missing. */
   ballast: BallastConfig;
   current_flap: CurrentFlapConfig;
   marker_smoothing_ms: number;
@@ -98,6 +101,7 @@ export interface Settings {
   units: 'kt' | 'kmh';
   /** How height above ground is shown. */
   height: 'ft' | 'm';
+  weight_unit: 'kg' | 'lb';
   /** AGL bar ends and the green band, in feet. */
   agl: { bottom_m: number; top_m: number; low_m: number; high_m: number };
   ui: {
@@ -106,6 +110,7 @@ export interface Settings {
     opacity: number;
     zoom: number;
     demo_mode: boolean;
+    external_panel_on_launch: boolean;
     /** The ballast slider on the display. */
     show_ballast: boolean;
     /** The height bar on the display. */
@@ -117,6 +122,8 @@ export interface Settings {
     /** Cylinder shading on the IAS and AGL fills, including the white end line. */
     bar_shading: boolean;
   };
-  panel_destination:PanelDestination;
+  /** Original ribbon bounds retained for the optional external panel. */
+  panel_destination: PanelDestination;
   window: WindowBounds | null;
+  main_window: WindowBounds | null;
 }
