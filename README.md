@@ -175,3 +175,6 @@ Enable installs the verified bundled panel, disabling removes a verified physica
 In Settings, each transition has a **Show divider** switch. On displays its Min weight and Max weight speed inputs; Off hides them, greys the transition row and merges the adjacent bands. Stored speed values are retained and restored when the divider is shown again. Consecutive exclusions form a single band. The actual simulator handle and its exact label are preserved, and excluded speeds are not required until their divider is shown again. The existing profile format and default behavior are unchanged.
 
 **Group hidden flap labels** (Display, off by default) controls the label text for adjacent flap detents with a hidden divider. Off displays the surviving last label (e.g. `5`); On displays all labels (e.g. `L-6-5`). Divider positions, exact handle mapping and recommendation groups remain the same. The setting is shared by the desktop and in-sim display.
+
+### Responsive speed-trigger labels
+When **Flap transitions** is enabled, the whole-number speed labels occupy a single row where their measured text widths fit. Crowded labels alternate between two rows while remaining aligned with the real dividers. Extremely dense values remain available on the dividers rather than overlapping neighboring text. The IAS calculations and units are unchanged.
