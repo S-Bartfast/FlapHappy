@@ -14,6 +14,7 @@ import { WeightControl } from './slider';
  * Display shown inside the sim. It reads the desktop app over localhost and does not keep its own profile.
  * XMLHttpRequest only: the in-sim browser has no fetch.
  */
+const POLL_MS = 100;
 const root = document.getElementById('app') as HTMLElement;
 const note = h('div', { class: 'fh-hint' }, 'Waiting for Flap Happy.');
 const slider = new WeightControl((f) => postBallast(f));
@@ -123,17 +124,36 @@ function aglFromState(state: CockpitState): AglScale | undefined {
   return agl;
 }
 
+let latest: CockpitState | null = null;
+
 function poll(): void {
   xhr('GET', '/api/state', null, (status, text) => {
+    let next: CockpitState | null = null;
     if (status === 200) {
       try {
-        paint(JSON.parse(text) as CockpitState);
+        next = JSON.parse(text) as CockpitState;
       } catch {
-        unavailable();
+        next = null;
       }
-    } else unavailable();
-    setTimeout(poll, 200);
+    }
+    if (next) latest = next;
+    else if (latest) {
+      latest = null;
+      unavailable();
+    }
+    setTimeout(poll, POLL_MS);
   });
+}
+
+/** Redraws between polls so the smoothed markers glide instead of stepping at the poll rate. */
+function frame(): void {
+  if (latest) paint(latest);
+  nextFrame(frame);
+}
+
+function nextFrame(fn: () => void): void {
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fn);
+  else setTimeout(fn, 33);
 }
 
 function unavailable(): void {
@@ -151,3 +171,4 @@ function unavailable(): void {
 }
 unavailable();
 poll();
+nextFrame(frame);
