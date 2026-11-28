@@ -21,7 +21,7 @@ function model(p: Profile | null, s: SimSample | null, f = 0, link = 'live' as '
 describe('display model', () => {
   it('simple guidance recommends by profile order, not flap label or handle index', () => {
     const p = makeProfile(6);
-    ['L', '6', '5', 'N', '4-3', '1'].forEach((label, i) => { p.flaps[i].label = label; p.flaps[i].handle_index = 5-i; });
+    ['L', '6', '5', 'N', '4-3', '1'].forEach((label, i) => { p.flaps[i].label = label; });
     const at = (iasKt: number) => model(p, sample({ flapIndex: 2, flapCount: 6, iasKt })).simple;
     expect(at(70)).toEqual({ current: 'N', suggestion: { label: '5', direction: 'slower' } });
     expect(at(94)).toEqual({ current: 'N', suggestion: { label: '4-3', direction: 'faster' } });
@@ -50,7 +50,7 @@ describe('display model', () => {
     for (const n of [1, 2, 6, 10]) {
       const p = makeProfile(n);
       for (let row = 0; row < n; row++) {
-        const m = model(p, sample({ flapIndex: row, flapCount: n, iasKt: 60 }));
+        const m = model(p, sample({ flapIndex: n - 1 - row, flapCount: n, iasKt: 60 }));
         expect(m.cells).toHaveLength(n);
         expect(m.ticks).toHaveLength(n + 1);
         expect(m.edges).toHaveLength(n + 1);
@@ -63,7 +63,7 @@ describe('display model', () => {
   it('highlights only the current flap even when the marker is over another column', () => {
     const p = makeProfile(6);
     const b = effectiveBoundaries(p, 0)!;
-    const m = model(p, sample({ flapIndex: 1, flapCount: 6, iasKt: (b[4] + b[5]) / 2 }));
+    const m = model(p, sample({ flapIndex: 4, flapCount: 6, iasKt: (b[4] + b[5]) / 2 }));
     expect(m.currentRow).toBe(1);
     expect(m.marker.pos).toBeGreaterThan(m.edges![4]);
     expect(m.marker.pos).toBeLessThan(m.edges![5]);
@@ -128,7 +128,7 @@ describe('display model', () => {
   it('incomplete profile: no bar, message, but cells and the current flap still work', () => {
     const p = makeProfile(6);
     p.vs_min.no_ballast_kt = null;
-    const m = model(p, sample({ flapIndex: 0, flapCount: 6 }));
+    const m = model(p, sample({ flapIndex: 5, flapCount: 6 }));
     expect(m.mode).toBe('incomplete');
     expect(m.barVisible).toBe(false);
     expect(m.incompleteMessage).toBe('profile incomplete: open settings');
@@ -156,21 +156,22 @@ describe('display model', () => {
     expect(m.marker.pos).toBeCloseTo((46 - 40) / (82 - 40), 8);
   });
 
-  it('shows raw height in the readout and the smoothed height drives the bar', () => {
+  it('the averaged height drives the readout and the smoothed height drives the bar', () => {
     const p = makeProfile(2);
-    const m = buildDisplayModel({
+    const input = {
       profile: p,
       validation: validateProfile(p),
       sample: sample({ aglFt: 600, flapCount: 2 }),
-      link: 'live',
+      link: 'live' as const,
       manualBallast: 0,
       ias: null,
-      aglFt: 200,
       flap: new CurrentFlapResolver().resolve(p, sample({ flapCount: 2 }), 1000),
-    });
-    expect(m.aglText).toBe('600 ft');
+    };
+    const m = buildDisplayModel({ ...input, aglFt: 200, aglReadFt: 450 });
+    expect(m.aglText).toBe('450 ft');
     expect(m.aglPos).toBe(0);
     expect(m.aglInBand).toBe(false);
+    expect(buildDisplayModel({ ...input, aglFt: 200 }).aglText).toBe('600 ft');
   });
 
   it('km/h converts the readout and the tick numbers from knots', () => {
@@ -368,7 +369,7 @@ it('estimates the visual floor using shown dividers and recommends the slowest p
   p.transitions[0] = { no_ballast_kt: null, max_ballast_kt: null, exclude_from_display: true };
   expect(validateProfile(p).ok).toBe(true);
   expect(effectiveBoundaries(p, 0)).toEqual([52, 64, 76, 114]);
-  const below = model(p, sample({ iasKt: 19, flapCount: 4, flapIndex: 2 }), 0, 'live', 60);
+  const below = model(p, sample({ iasKt: 19, flapCount: 4, flapIndex: 1 }), 0, 'live', 60);
   expect(below.cells.map(cell => cell.label)).toEqual(['2', '3', '4']);
   expect(below.simple).toEqual({ current: '3', suggestion: { label: '2', direction: 'slower' } });
   expect(below.alert).toBeNull();

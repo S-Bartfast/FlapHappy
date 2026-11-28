@@ -2,7 +2,8 @@ import { App } from './app';
 import { SimulatedSource } from '../adapters/simulated/simulated-source';
 import { MemoryProfileStore } from '../adapters/simulated/memory-store';
 import { BrowserHost } from '../adapters/simulated/browser-host';
-import { mountDevPanel } from '../adapters/simulated/devpanel';
+import { mountDevPanel as mountDevPanelWith } from '../adapters/simulated/devpanel';
+import { localDevPanelStorage } from '../adapters/browser/devpanel-storage';
 import { BridgeDataSource, BridgeHost, BridgeProfileStore } from '../adapters/electron/bridge-adapters';
 import { PRESETS } from '../profiles';
 
@@ -12,6 +13,8 @@ import { PRESETS } from '../profiles';
  * Browser: simulated source, in-memory store, browser host. Query: ?seed=demo|none&dev=0|1
  * Only `demo` loads the built-in profiles. Any other seed, including `none`, stays empty.
  */
+const mountDevPanel = (container: HTMLElement, app: App) => mountDevPanelWith(container, app, localDevPanelStorage);
+
 async function boot(): Promise<void> {
   const root = document.getElementById('app') as HTMLElement;
   const q = new URLSearchParams(window.location.search);

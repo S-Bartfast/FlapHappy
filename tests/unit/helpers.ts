@@ -2,11 +2,11 @@ import { createBlankProfile } from '../../core/profile';
 import type { Profile } from '../../core/types';
 import { emptySample, type SimSample } from '../../core/sim';
 
-/** Valid N-row profile: row k has handle index k, bucket widths of 12 kt (no ballast) / 16 kt (max), and one VNE above both. */
+/** Valid N-row profile: row k has handle index N-1-k, bucket widths of 12 kt (no ballast) / 16 kt (max), and one VNE above both. */
 export function makeProfile(n: number, opts: { id?: string } = {}): Profile {
   const p = createBlankProfile(opts.id ?? `test-${n}`);
   for (let i = 0; i < n; i++) {
-    p.flaps.push({ label: String(i + 1), handle_index: i });
+    p.flaps.push({ label: String(i + 1) });
   }
   p.weight_kg = { light: 400, heavy: 600 };
   p.vs_min = { no_ballast_kt: 40, max_ballast_kt: 50 };

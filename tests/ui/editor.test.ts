@@ -54,19 +54,24 @@ describe('settings editor: build the AS 33 Me table from scratch', () => {
 
     const labels = ['5', 'N', '4', '3', '2', '1'];
     for (let i = 0; i < 6; i++) await fill(page, `flaps[${i}].label`, labels[i]);
-    for (let i = 0; i < 6; i++) await fill(page, `flaps[${i}].handle_index`, String(i));
     expect(await validHead(page)).toContain('Not applied: fix');
     await page.screenshot({ path: `${SHOT_DIR}/flaphappy-editor-incomplete.png`, fullPage: true });
 
     expect(await page.locator('.fh-weight-mode').inputValue()).toBe('manual');
     expect(await page.locator(fieldSel('weight_kg.light')).count()).toBe(0);
+    const speedLabels = () => page.locator('.fh-settings .fh-minrow .fh-sub').allTextContents();
+    expect(await speedLabels()).toEqual(['No ballast', 'Max ballast']);
     await page.selectOption('.fh-weight-mode', 'live');
+    expect(await speedLabels()).toEqual(['Min weight', 'Max weight']);
     expect(await page.locator('.fh-settings .fh-save').isDisabled()).toBe(true);
     await fill(page, 'weight_kg.light', '400');
     expect(await page.locator('.fh-settings .fh-save').isDisabled()).toBe(true);
     await fill(page, 'weight_kg.heavy', '600');
     await fill(page, 'vs_min.no_ballast_kt', '48');
     await fill(page, 'vs_min.max_ballast_kt', '56');
+    // Added rows start with their dividers hidden.
+    expect(await page.locator('.fh-settings .fh-trow.fh-transition-hidden').count()).toBe(5);
+    for (const toggle of await page.locator('.fh-settings .fh-transition-toggle').all()) await toggle.click();
     const no = [62, 74, 86, 100, 118];
     const mx = [70, 83, 97, 113, 133];
     for (let k = 0; k < 5; k++) {
@@ -84,15 +89,13 @@ describe('settings editor: build the AS 33 Me table from scratch', () => {
     });
     expect(stored.schema).toBe('flaphappy.profile/3');
     expect(stored.flaps.map((f: any) => f.label)).toEqual(labels);
-    // The user types each sim index. These rows were added in order, so 0..5.
-    expect(stored.flaps.map((f: any) => f.handle_index)).toEqual([0, 1, 2, 3, 4, 5]);
     expect(stored.transitions).toHaveLength(5);
     expect(stored.vne).toBe(145);
     await page.screenshot({ path: `${SHOT_DIR}/flaphappy-editor-as33.png`, fullPage: true });
 
     await page.click('.fh-settings .fh-back');
     await page.evaluate(() => (window as any).__flapHappy.app.setBallast(0, true));
-    await sim(page, { flapCount: 8, flapIndex: 1, iasKt: 90 });
+    await sim(page, { flapCount: 8, flapIndex: 4, iasKt: 90 });
     await page.waitForTimeout(500);
     expect(await page.$$eval('.fh-display .fh-cell', (e) => e.map((x) => x.textContent))).toEqual(labels);
     expect(await page.$$eval('.fh-display .fh-cell.current', (e) => e.map((x) => x.textContent))).toEqual(['N']);
@@ -121,8 +124,10 @@ describe('settings editor: row rules, validation, undo', () => {
     expect([await rowCount(page), await transCount(page)]).toEqual([3, 2]);
     await page.click('.fh-settings .fh-addrow');
     expect([await rowCount(page), await transCount(page)]).toEqual([4, 3]);
-    // A prefilled transition is shown amber until edited.
-    expect(await page.$$eval('.fh-settings .fh-trow.prefilled', (e) => e.length)).toBe(1);
+    // The new row is added at the bottom, with its divider hidden.
+    expect(await page.locator('.fh-settings .fh-lbl[data-path^="flaps"]').last().getAttribute('data-path')).toBe('flaps[0].label');
+    expect(await page.locator('.fh-settings .fh-trow').last().getAttribute('class')).toContain('fh-transition-hidden');
+    expect(await page.$$eval('.fh-settings .fh-trow.fh-transition-hidden', (e) => e.length)).toBe(1);
     const labelsBefore = await page.$$eval('.fh-settings .fh-lbl[data-path^="flaps"]', (e) => e.map((x) => (x as HTMLInputElement).value));
     await page.locator('.fh-settings .fh-frow').nth(1).locator('.fh-remove').click();
     expect([await rowCount(page), await transCount(page)]).toEqual([3, 2]);
@@ -158,15 +163,18 @@ describe('settings editor: row rules, validation, undo', () => {
     await page.close();
   });
 
-  it('flap rows show only the label, sim index and remove; the live index is shown and its row marked', async () => {
+  it('flap rows show only the label and remove; the live index is shown and its row marked', async () => {
     const page = await openWith(makeProfile(3, { id: 'live' }));
-    expect(await page.$$eval('.fh-settings .fh-frow input, .fh-settings .fh-frow select', (e) => e.map((x) => x.getAttribute('data-path')))).toEqual(['flaps[0].label', 'flaps[0].handle_index', 'flaps[1].label', 'flaps[1].handle_index', 'flaps[2].label', 'flaps[2].handle_index']);
+    expect(await page.$$eval('.fh-settings .fh-frow input, .fh-settings .fh-frow select', (e) => e.map((x) => x.getAttribute('data-path')))).toEqual(['flaps[2].label', 'flaps[1].label', 'flaps[0].label']);
     expect(await page.locator('.fh-settings .fh-frow').nth(0).locator('button').evaluateAll((e) => e.map((x) => x.className))).toEqual(['fh-btn fh-remove']);
-    expect(await page.$$eval('.fh-settings .fh-frow .fh-handle', (e) => e.map((x) => (x as HTMLInputElement).value))).toEqual(['0', '1', '2']);
-    await sim(page, { flapCount: 4, flapIndex: 1, totalWeightKg: 537.25 });
+    await sim(page, { flapCount: 4, flapIndex: 0, totalWeightKg: 537.25 });
+    await page.waitForFunction(() => document.querySelector('.fh-settings .fh-frow.live .fh-lbl') !== null);
+    expect(await page.locator('.fh-settings .fh-frow').nth(0).evaluate((e) => e.classList.contains('live'))).toBe(true);
+    await sim(page, { flapIndex: 1 });
     await page.waitForTimeout(300);
     expect(await page.$eval('.fh-settings .fh-liveline', (e) => e.textContent)).toBe('Live: handle index 1 of 4 [flap "2"] · Aircraft weight: 537 kg');
     expect(await page.$$eval('.fh-settings .fh-frow.live', (e) => e.length)).toBe(1);
+    expect(await page.locator('.fh-settings .fh-frow.live .fh-lbl').inputValue()).toBe('2');
     const readout = page.locator('.fh-settings .fh-liveline');
     await page.click('[data-weight-unit="lb"]');
     expect(await readout.textContent()).toContain('1184 lb');
@@ -187,13 +195,14 @@ describe('settings editor: row rules, validation, undo', () => {
     await page.close();
   });
 
-  it('dragging a row moves its label; the sim indexes and transition speeds stay put', async () => {
+  it('dragging a row moves its label; the transition speeds stay put', async () => {
     const page = await openWith(makeProfile(3, { id: 'reorder' }));
     const labels = () => page.$$eval('.fh-settings .fh-lbl[data-path^="flaps"]', (e) => e.map((x) => (x as HTMLInputElement).value));
     const t1 = () => page.$eval(fieldSel('transitions[0].no_ballast_kt'), (e) => (e as HTMLInputElement).value);
     const before = await t1();
-    const grip = (await page.locator('.fh-settings .fh-frow').nth(0).locator('.fh-grip').boundingBox())!;
-    const dest = (await page.locator('.fh-settings .fh-frow').nth(2).boundingBox())!;
+    // Rows are shown fastest first: drag the slowest (bottom) row to the top.
+    const grip = (await page.locator('.fh-settings .fh-frow').nth(2).locator('.fh-grip').boundingBox())!;
+    const dest = (await page.locator('.fh-settings .fh-frow').nth(0).boundingBox())!;
     await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
     await page.mouse.down();
     await page.mouse.move(dest.x + dest.width / 2, dest.y + dest.height / 2, { steps: 8 });
@@ -205,14 +214,13 @@ describe('settings editor: row rules, validation, undo', () => {
     expect(ghost && ghost.value).toBe('1');
     expect(Number(ghost && ghost.opacity)).toBeLessThan(1);
     const spacing = await page.$$eval('.fh-settings .fh-frow', (els) => els.map((el) => ({ open: (el as HTMLElement).style.marginTop, collapsed: el.classList.contains('fh-dragging') })));
-    expect(spacing[0].collapsed).toBe(true);
-    expect(parseInt(spacing[2].open, 10)).toBeGreaterThan(20);
+    expect(spacing[2].collapsed).toBe(true);
+    expect(parseInt(spacing[0].open, 10)).toBeGreaterThan(20);
     await page.mouse.up();
     expect(await page.$('.fh-dragghost')).toBeNull();
-    expect(await labels()).toEqual(['2', '3', '1']);
+    expect(await labels()).toEqual(['1', '3', '2']);
     expect(await t1()).toBe(before);
-    expect(await page.$eval('.fh-settings .fh-transname', (e) => e.textContent)).toBe('Transition 2 -> 3');
-    expect(await page.$$eval('.fh-settings .fh-frow .fh-handle', (e) => e.map((x) => (x as HTMLInputElement).value))).toEqual(['0', '1', '2']);
+    expect(await page.locator('.fh-settings .fh-transname').last().textContent()).toBe('Transition 2 -> 3');
     await page.close();
   });
 

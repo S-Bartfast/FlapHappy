@@ -161,7 +161,8 @@ export class SimConnectSource implements DataSource {
           iasKt: ias,
           totalWeightKg: isFinite(weight) && weight > 0 ? weight : null,
           flapIndex: idx,
-          flapCount: count,
+          // FLAPS NUM HANDLE POSITIONS excludes the retracted position: indexes run 0..count.
+          flapCount: isFinite(count) && count >= 0 ? count + 1 : null,
           flapPercent: pct,
           onGround: ground > 0.5,
           aglFt: agl,
