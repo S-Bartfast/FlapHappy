@@ -26,6 +26,8 @@ export interface CockpitState {
   zoom: number;
   showBallast: boolean;
   showAgl: boolean;
+  /** Missing on an older desktop app means ordinary ribbon mode. */
+  simpleFlap?: boolean;
   groupHiddenFlapLabels?: boolean;
   showTransitions: boolean;
   showWind: boolean;
