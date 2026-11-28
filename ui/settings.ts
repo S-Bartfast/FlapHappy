@@ -279,16 +279,17 @@ export class SettingsView {
       return n === null ? null : unitToKnots(n, unit);
     };
     const withUnit = (inp: HTMLInputElement, text = unitLabel(unit), cls = '') => h('span', { class: 'fh-speedbox' + cls }, inp, h('span', { class: 'fh-insuffix', 'aria-hidden': 'true' }, h('span', {}, text)));
+    const [lightName, heavyName] = this.weightMode === 'live' ? ['Min weight', 'Max weight'] : ['No ballast', 'Max ballast'];
     const speedRow = (title: string, cls: string, nameEl: HTMLElement | null, get: () => { no_ballast_kt: number | null; max_ballast_kt: number | null }, path: string, isEnd: boolean) => {
       const s = get();
       return h(
         'div',
         { class: 'fh-erow fh-speedrow ' + cls },
         nameEl ?? h('div', { class: 'fh-rowname' }, title),
-        h('label', { class: 'fh-sub' }, 'Min weight'),
-        withUnit(this.fieldInput(path + '.no_ballast_kt', formatSpeedField(s.no_ballast_kt, unit), { cls: 'fh-speed', step: '1', onInput: (t) => { get().no_ballast_kt = storeSpeed(t); }, label: title + ' Min weight' })),
-        h('label', { class: 'fh-sub' }, 'Max weight'),
-        withUnit(this.fieldInput(path + '.max_ballast_kt', formatSpeedField(s.max_ballast_kt, unit), { cls: 'fh-speed', step: '1', placeholder: isEnd ? 'same' : '', onInput: (t) => { get().max_ballast_kt = storeSpeed(t); }, label: title + ' Max weight' })),
+        h('label', { class: 'fh-sub' }, lightName),
+        withUnit(this.fieldInput(path + '.no_ballast_kt', formatSpeedField(s.no_ballast_kt, unit), { cls: 'fh-speed', step: '1', onInput: (t) => { get().no_ballast_kt = storeSpeed(t); }, label: title + ' ' + lightName })),
+        h('label', { class: 'fh-sub' }, heavyName),
+        withUnit(this.fieldInput(path + '.max_ballast_kt', formatSpeedField(s.max_ballast_kt, unit), { cls: 'fh-speed', step: '1', placeholder: isEnd ? 'same' : '', onInput: (t) => { get().max_ballast_kt = storeSpeed(t); }, label: title + ' ' + heavyName })),
       );
     };
 
@@ -303,7 +304,7 @@ export class SettingsView {
       withUnit(this.fieldInput('weight_kg.light', formatWeightField(d.weight_kg.light, this.app.settings.weight_unit), { cls: 'fh-speed', step: '1', label: 'Light flying weight (' + this.app.settings.weight_unit + ')', onInput: (t) => { const v = numberOrNull(t); d.weight_kg.light = v === null ? null : weightToKilograms(v, this.app.settings.weight_unit); } }), this.app.settings.weight_unit, ' fh-weightbox'),
       h('label', { class: 'fh-sub' }, 'Heavy'),
       withUnit(this.fieldInput('weight_kg.heavy', formatWeightField(d.weight_kg.heavy, this.app.settings.weight_unit), { cls: 'fh-speed', step: '1', label: 'Heavy flying weight (' + this.app.settings.weight_unit + ')', onInput: (t) => { const v = numberOrNull(t); d.weight_kg.heavy = v === null ? null : weightToKilograms(v, this.app.settings.weight_unit); } }), this.app.settings.weight_unit, ' fh-weightbox'));
-    this.table.appendChild(h('div', { class: 'fh-hint' }, this.weightMode === 'live' ? 'Enter both positive loaded weights (Light below Heavy) before saving. The display uses live MSFS aircraft weight.' : 'No flying weights are required. The display uses the saved manual slider position with the No/Max Ballast speeds.'));
+    this.table.appendChild(h('div', { class: 'fh-hint' }, this.weightMode === 'live' ? 'Enter both positive loaded weights (Light below Heavy) before saving. The display uses live MSFS aircraft weight.' : 'No flying weights are required. The display uses the saved manual slider position with the No ballast and Max ballast speeds.'));
     // Built slowest first (the profile's order), then shown fastest at the top.
     const rows: HTMLElement[] = [speedRow('Min (stall)', 'fh-minrow', null, () => d.vs_min, 'vs_min', true)];
 
