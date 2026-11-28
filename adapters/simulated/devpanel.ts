@@ -1,6 +1,6 @@
 import { h, setText } from '../../ui/dom';
 import type { App } from '../../ui/app';
-import { FAULTS, type Fault, type SimControls } from './simulated-source';
+import { FAULTS, defaultControls, type Fault, type SimControls } from './simulated-source';
 import { ScenarioPlayer, type Scenario } from './scenario';
 import iasSweep from './scenarios/ias-sweep.json';
 import lever from './scenarios/lever-sequence.json';
@@ -15,11 +15,11 @@ export const SCENARIOS: Scenario[] = [iasSweep, lever, ballastSweep, connect, fa
  * Dev-only control panel for the simulated source (hidden in normal use; shown with --source=simulated,
  * --dev, or on the browser harness page). Everything here drives `SimulatedSource.controls`.
  */
-export function mountDevPanel(container: HTMLElement, app: App): void {
+export function mountDevPanel(container: HTMLElement, app: App, storage?: DevPanelStorage): void {
   const sim = app.sim;
   const c = sim.controls;
-  restoreControls(c);
-  const save = () => saveControls(c);
+  restoreControls(c, storage);
+  const save = () => saveControls(c, storage);
   const readouts: Record<string, HTMLElement> = {};
   const row = (...kids: Array<HTMLElement | null>) => h('div', { class: 'fh-devrow' }, ...kids);
   const lab = (t: string) => h('label', { class: 'fh-devlab' }, t);
@@ -71,7 +71,7 @@ export function mountDevPanel(container: HTMLElement, app: App): void {
     save();
     sim.tick(0);
   }
-  const count = h('input', { type: 'number', min: '0', max: '16', value: String(c.flapCount), class: 'fh-in fh-dev-count', 'aria-label': 'Simulated flap count', oninput: (e: Event) => { c.flapCount = Math.max(0, Math.round(Number((e.target as HTMLInputElement).value) || 0)); showFlap(); save(); sim.tick(0); } }) as HTMLInputElement;
+  const count = h('input', { type: 'number', min: '0', max: '16', value: String(c.flapCount), class: 'fh-in fh-dev-count', 'aria-label': 'Simulated flap count', oninput: (e: Event) => { c.flapCount = Math.max(0, Math.round(Number((e.target as HTMLInputElement).value) || 0)); clampFlapIndex(c); showFlap(); save(); sim.tick(0); } }) as HTMLInputElement;
   showFlap();
 
   const toggle = (label: string, key: 'connected' | 'inFlight' | 'onGround', cls: string) =>
@@ -125,9 +125,19 @@ export function mountDevPanel(container: HTMLElement, app: App): void {
 
   const ballastSweepBtn = h('button', { class: 'fh-btn', type: 'button', onclick: () => { scenSel.value = '2'; play(); } }, 'Ballast sweep');
 
-  container.appendChild(
+  const reset = () => {
+    stop();
+    Object.assign(c, defaultControls());
+    save();
+    container.removeChild(panel);
+    mountDevPanel(container, app, storage);
+  };
+
+  const panel = container.appendChild(
     h('div', { class: 'fh-devpanel' },
-      h('div', { class: 'fh-devtitle' }, 'DEV: simulated source'),
+      h('div', { class: 'fh-devtitle' },
+        h('span', {}, 'DEV: simulated source'),
+        h('button', { class: 'fh-btn fh-dev-reset', type: 'button', onclick: reset }, 'Reset Demo controls')),
       row(lab('IAS'), iasRange, iasNum, lab('kt')),
       row(lab('Simulated weight (kg)'), h('input', { type: 'number', min: '0', step: '1', class: 'fh-in', value: c.totalWeightKg === null ? '' : String(c.totalWeightKg), 'aria-label': 'Simulated weight (kg)', oninput: (e: Event) => { const v = (e.target as HTMLInputElement).value; c.totalWeightKg = v ? Number(v) : null; save(); sim.tick(0); } })),
       row(lab('AGL'), aglRange, aglNum, lab('ft')),
@@ -141,25 +151,21 @@ export function mountDevPanel(container: HTMLElement, app: App): void {
   sim.tick(0);
 }
 
-const STORE_KEY = 'flaphappy.devpanel';
 type SavedControls = Pick<SimControls, 'iasKt' | 'totalWeightKg' | 'aglFt' | 'windKt' | 'flapIndex' | 'flapCount' | 'title' | 'connected' | 'inFlight' | 'onGround'>;
 
-function saveControls(c: SimControls): void {
-  const keep: SavedControls = { iasKt: c.iasKt, totalWeightKg: c.totalWeightKg, aglFt: c.aglFt, windKt: c.windKt, flapIndex: c.flapIndex, flapCount: c.flapCount, title: c.title, connected: c.connected, inFlight: c.inFlight, onGround: c.onGround };
-  try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(keep));
-  } catch {
-    // Storage can be unavailable (private windows); the panel still works unsaved.
-  }
+/** Where the panel keeps its control values between sessions. `load` may return anything; it is validated here. */
+export interface DevPanelStorage {
+  load(): unknown;
+  save(data: SavedControls): void;
 }
 
-function restoreControls(c: SimControls): void {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-  } catch {
-    return;
-  }
+function saveControls(c: SimControls, storage: DevPanelStorage | undefined): void {
+  if (!storage) return;
+  storage.save({ iasKt: c.iasKt, totalWeightKg: c.totalWeightKg, aglFt: c.aglFt, windKt: c.windKt, flapIndex: c.flapIndex, flapCount: c.flapCount, title: c.title, connected: c.connected, inFlight: c.inFlight, onGround: c.onGround });
+}
+
+function restoreControls(c: SimControls, storage: DevPanelStorage | undefined): void {
+  const raw = storage ? storage.load() : null;
   if (!raw || typeof raw !== 'object') return;
   const r = raw as Record<string, unknown>;
   const num = (k: 'iasKt' | 'aglFt' | 'windKt' | 'flapIndex' | 'flapCount') => {
@@ -170,4 +176,11 @@ function restoreControls(c: SimControls): void {
   if (r.totalWeightKg === null || (typeof r.totalWeightKg === 'number' && isFinite(r.totalWeightKg))) c.totalWeightKg = r.totalWeightKg as number | null;
   if (typeof r.title === 'string') c.title = r.title;
   for (const k of ['connected', 'inFlight', 'onGround'] as const) if (typeof r[k] === 'boolean') c[k] = r[k] as boolean;
+  c.flapCount = Math.round(c.flapCount);
+  clampFlapIndex(c);
+}
+
+/** Keeps the handle index a whole number inside 0..count-1. */
+function clampFlapIndex(c: SimControls): void {
+  c.flapIndex = Math.max(0, Math.min(Math.max(c.flapCount - 1, 0), Math.round(c.flapIndex)));
 }
