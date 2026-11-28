@@ -191,7 +191,7 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       const {chromium}=await import('playwright-core');const {chromePath}=await import('./browser-env');
       browser=await chromium.launch({executablePath:chromePath(),args:['--no-sandbox']});const cockpit=await browser.newPage();await cockpit.goto(panelUrl+'/panel.html');
       const sim=async(patch:Record<string,unknown>)=>page.evaluate(value=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,value);sim.tick(0);},patch);
-      await sim({flapCount:8,flapIndex:1,totalWeightKg:400,iasKt:80});
+      await sim({flapCount:8,flapIndex:6,totalWeightKg:400,iasKt:80});
       const hosts=[external,cockpit];
       for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-cell.current')!==null);
       expect((await getFeed()).groupHiddenFlapLabels).toBe(false);
@@ -209,7 +209,7 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       for(const host of hosts)await host.waitForFunction(()=>document.querySelector<HTMLElement>('.fh-simple-actual')?.textContent==='6'&&document.querySelector('.fh-simple-arrow.on.faster')!==null&&Array.from(document.querySelectorAll<HTMLElement>('.fh-simple-pill')).some(e=>e.offsetHeight>0&&e.textContent==='N'));
       await sim({iasKt:30});
       for(const host of hosts)await host.waitForFunction(()=>document.querySelector<HTMLElement>('.fh-simple-actual')?.textContent==='6'&&document.querySelectorAll('.fh-simple-arrow.on').length===0);
-      await sim({flapIndex:3,iasKt:30});
+      await sim({flapIndex:4,iasKt:30});
       for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-simple-arrow.on.slower')!==null&&Array.from(document.querySelectorAll<HTMLElement>('.fh-simple-pill')).some(e=>e.offsetHeight>0&&e.textContent==='L-6-5'));
       await page.locator('.fh-group-hidden-labels').locator('..').click();
       for(const host of hosts)await host.waitForFunction(()=>Array.from(document.querySelectorAll<HTMLElement>('.fh-simple-pill')).some(e=>e.offsetHeight>0&&e.textContent==='5'));
@@ -233,7 +233,7 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
     try{
       let {app,page}=session;
       await page.click('.fh-main-settings');
-      const first=()=>page.locator('.fh-trow').nth(0), second=()=>page.locator('.fh-trow').nth(1);
+      const first=()=>page.locator('.fh-trow').nth(2), second=()=>page.locator('.fh-trow').nth(1);
       const light=()=>first().locator('[data-path="transitions[0].no_ballast_kt"]'), heavy=()=>first().locator('[data-path="transitions[0].max_ballast_kt"]');
       await first().getByRole('switch',{name:'Show divider Transition 1 -> 2'}).waitFor();
       expect(await first().getByRole('switch').isChecked()).toBe(true);expect(await second().getByRole('switch').isChecked()).toBe(false);
@@ -242,7 +242,7 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       const toggle=first().getByRole('switch');await toggle.focus();await toggle.press('Space');
       expect(await toggle.isChecked()).toBe(false);expect(await light().isVisible()).toBe(false);expect(await heavy().isDisabled()).toBe(true);
       expect(await toggle.evaluate(el=>document.activeElement===el)).toBe(true);
-      await toggle.press('Tab');expect(await page.evaluate(()=>document.activeElement?.getAttribute('data-path'))).toBe('flaps[1].label');
+      await toggle.press('Tab');expect(await page.evaluate(()=>document.activeElement?.getAttribute('data-path'))).toBe('flaps[0].label');
       await first().locator('.fh-transition-toggle').click();
       expect(await light().inputValue()).toBe('54');expect(await heavy().inputValue()).toBe('68');
       expect(await light().isEnabled()).toBe(true);
@@ -262,7 +262,7 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       expect((await getFeed()).profile.transitions[0].exclude_from_display).toBe(true);
       expect((await getFeed()).groupHiddenFlapLabels).toBe(false);
       const external=await openExternal(app,page);
-      await page.evaluate(()=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,{totalWeightKg:400,flapCount:4,flapIndex:1,iasKt:70});sim.tick(0);});
+      await page.evaluate(()=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,{totalWeightKg:400,flapCount:4,flapIndex:2,iasKt:70});sim.tick(0);});
       await external.waitForFunction(()=>document.querySelector('.fh-cell.current')?.textContent==='3'&&document.querySelector('.fh-badge')?.textContent==='2');
       expect(await external.locator('.fh-cell').allTextContents()).toEqual(['3','4']);
       await app.close();session=await launch(ud);({app,page}=session);
@@ -396,12 +396,10 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       await page.waitForSelector('.fh-settings .fh-addrow');
       const labels = ['5','N','4','3','2','1'];
       for (let i=0;i<6;i++) await page.click('.fh-settings .fh-addrow');
-      for (let i=0;i<6;i++) {
-        await page.fill(`.fh-settings [data-path="flaps[${i}].label"]`,labels[i]);
-        await page.fill(`.fh-settings [data-path="flaps[${i}].handle_index"]`,String(i));
-      }
+      for (let i=0;i<6;i++) await page.fill(`.fh-settings [data-path="flaps[${i}].label"]`,labels[i]);
       await page.fill('.fh-settings [data-path="vs_min.no_ballast_kt"]','48');
       await page.fill('.fh-settings [data-path="vs_min.max_ballast_kt"]','56');
+      for (const toggle of await page.locator('.fh-settings .fh-transition-toggle').all()) await toggle.click();
       const no=[62,74,86,100,118], mx=[70,83,97,113,133];
       for(let k=0;k<5;k++) {
         await page.fill(`.fh-settings [data-path="transitions[${k}].no_ballast_kt"]`,String(no[k]));
@@ -515,10 +513,11 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       const {chromium}=await import('playwright-core');
       const executablePath=[process.env.CHROME_PATH,'C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','/usr/bin/chromium','/usr/bin/google-chrome'].find(p=>p&&fs.existsSync(p));
       browser=await chromium.launch({executablePath,args:['--no-sandbox']});const cockpit=await browser.newPage();await cockpit.goto(panelUrl+'/panel.html');
+      await page.evaluate(()=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,{flapCount:2,flapIndex:1});sim.tick(0);});
       for(const host of [external,cockpit])await host.waitForFunction(()=>document.querySelector('.fh-cell.current')?.textContent==='First');
       await page.click('.fh-main-settings');await page.waitForSelector('[data-path="flaps[0].label"]');
       await page.fill('[data-path="flaps[0].label"]','First X');
-      await page.evaluate(()=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,{title:'Other glider',totalWeightKg:500,flapCount:3,flapIndex:0});sim.tick(0);});
+      await page.evaluate(()=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,{title:'Other glider',totalWeightKg:500,flapCount:3,flapIndex:2});sim.tick(0);});
       await waitUntil(async()=> (await getFeed()).profile?.id===second.id,'new profile in panel session');
       for(const host of [external,cockpit]){
         await host.waitForFunction(()=>document.querySelector('.fh-cell.current')?.textContent==='Second');

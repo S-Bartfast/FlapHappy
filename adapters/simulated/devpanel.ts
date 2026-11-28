@@ -2,6 +2,7 @@ import { h, setText } from '../../ui/dom';
 import type { App } from '../../ui/app';
 import { FAULTS, defaultControls, type Fault, type SimControls } from './simulated-source';
 import { ScenarioPlayer, type Scenario } from './scenario';
+import { handleIndexOf } from '../../core/profile';
 import iasSweep from './scenarios/ias-sweep.json';
 import lever from './scenarios/lever-sequence.json';
 import ballastSweep from './scenarios/ballast-sweep.json';
@@ -102,7 +103,7 @@ export function mountDevPanel(container: HTMLElement, app: App, storage?: DevPan
     player = new ScenarioPlayer(sc, {
       vs: b ? b[0] : null,
       vne: b ? b[b.length - 1] : null,
-      rowHandles: p ? p.flaps.map((r) => r.handle_index ?? 0) : [],
+      rowHandles: p ? p.flaps.map((_, i) => handleIndexOf(p, i)) : [],
     });
     startedAt = Date.now();
     setText(scenState, 'running: ' + sc.name);

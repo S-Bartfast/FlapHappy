@@ -50,7 +50,7 @@ describe('simple flap indicator', () => {
       a.setShowTransitions(true);
       a.setBallast(0);
       const sim = (window as any).__flapHappy.sim;
-      Object.assign(sim.controls, { totalWeightKg:400,flapCount: 6, flapIndex: 3, iasKt: 94, connected: true, onGround: false, inFlight: true });
+      Object.assign(sim.controls, { totalWeightKg:400,flapCount: 6, flapIndex: 2, iasKt: 94, connected: true, onGround: false, inFlight: true });
       sim.tick(0);
     }, p);
     expect(await page.locator('.fh-display .fh-ias-row').isVisible()).toBe(true);
@@ -97,7 +97,7 @@ describe('simple flap indicator', () => {
     await page.route('**/api/state', route => route.fulfill({
       status: failure ? 503 : 200,
       contentType: 'application/json',
-      body: JSON.stringify({ ready: true, profile: p, sample: sample({ flapIndex: 3, flapCount: 6, iasKt, connected: link }),
+      body: JSON.stringify({ ready: true, profile: p, sample: sample({ flapIndex: 2, flapCount: 6, iasKt, connected: link }),
         receivedAt: Date.now(), ballast: 0, units: 'kt', height: 'ft', agl: defaultSettings().agl, zoom: 1,
         simpleFlap, showBallast: false, showAgl: true, showTransitions: true, showWind: true, barShading: true }),
     }));
