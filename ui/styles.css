@@ -260,3 +260,13 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-panel-install .fh-panel-path { min-width:0; flex:1; }
 .fh-panel-update { position:relative; }
 .fh-panel-update::after { content:'!'; font:bold 11px sans-serif; color:#171717; background:#ffc557; position:absolute; right:-4px; top:-4px; border-radius:50%; width:15px; height:15px; line-height:15px; text-align:center; }
+
+.fh-badge.mapped { color:#fff; background:#275b82; }
+.fh-trow { max-width:100%; }
+.fh-transition-toggle { display:inline-flex; align-items:center; margin-right:8px; color:#cfd9e6; font-size:12px; cursor:pointer; }
+.fh-transition-toggle > span:first-child { margin-right:6px; }
+.fh-transition-toggle .fh-slide { flex:0 0 44px; }
+.fh-transition-toggle .fh-slide input:focus + .fh-slidetrack { outline:2px solid #8fc2ee; outline-offset:2px; }
+.fh-trow > [hidden] { display:none !important; }
+.fh-trow.fh-transition-hidden { background:#1b2027; border-color:#414852; }
+.fh-trow.fh-transition-hidden .fh-transname { color:#9da5b0; }

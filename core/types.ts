@@ -39,7 +39,7 @@ export interface Profile {
   flaps: FlapPosition[];
   handle_count: number | null;
   vs_min: Speed;
-  transitions: Speed[];
+  transitions: Array<Speed & { exclude_from_display?: boolean }>;
   /** Knots. Saved files store this as a single `vne_ms`, with no ballast split. */
   vne: number | null;
   /** Loaded flying weights for the existing light/heavy speed columns (kg). */
@@ -121,6 +121,7 @@ export interface Settings {
     auto_hide_external: boolean;
     /** The transition speeds under the flap row. */
     show_transitions: boolean;
+    group_hidden_flap_labels: boolean;
     /** The wind speed drawn on the AGL bar. */
     show_wind: boolean;
     /** Cylinder shading on the IAS and AGL fills, including the white end line. */

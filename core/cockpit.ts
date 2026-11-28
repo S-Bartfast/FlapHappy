@@ -30,6 +30,7 @@ export interface CockpitState {
   simpleFlap?: boolean;
   /** Optional for older apps; applied by the in-sim toolbar wrapper only. */
   autoHideExternal?:boolean;
+  groupHiddenFlapLabels?: boolean;
   showTransitions: boolean;
   showWind: boolean;
   /** Cylinder shading on the IAS and AGL fills. Missing means on. */

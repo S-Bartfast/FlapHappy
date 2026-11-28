@@ -23,6 +23,13 @@ it('switches between one and two non-overlapping lanes in both renderers',async(
  await check(desktop,'.fh-display ',1);await check(cockpit,'',1);
  current=dense;await load(dense);await desktop.setViewportSize({width:350,height:900});await cockpit.setViewportSize({width:350,height:500});
  await check(desktop,'.fh-display ',2);await check(cockpit,'',2);
+ const grouped=makeProfile(6);
+ grouped.transitions[1]={no_ballast_kt:64,max_ballast_kt:82,exclude_from_display:true};
+ current=grouped;await load(grouped);
+ for(const [page,prefix] of [[desktop,'.fh-display '],[cockpit,'']] as const){
+  await page.waitForFunction(prefix=>document.querySelectorAll(prefix+'.fh-ticktext').length===6,prefix);
+  expect(await page.locator(prefix+'.fh-ticktext').allTextContents()).toEqual(['40','52','76','88','100','146']);
+ }
  current=wide;await load(wide);await desktop.setViewportSize({width:820,height:900});await cockpit.setViewportSize({width:820,height:500});
  await check(desktop,'.fh-display ',1);await check(cockpit,'',1);
  await desktop.close();await cockpit.close();
