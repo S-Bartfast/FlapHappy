@@ -3,7 +3,7 @@ import type { ActiveSession } from '../core/cockpit';
 import type { Profile, ProfileMeta, Settings, ValidationResult } from '../core/types';
 import { validateProfile } from '../core/validate';
 import { CurrentFlapResolver, type CurrentFlap } from '../core/flapmap';
-import { buildDisplayModel, deriveLink, type DisplayModel } from '../core/display-model';
+import { STALE_MS, buildDisplayModel, deriveLink, type DisplayModel } from '../core/display-model';
 import { canSaveWeightMode, interpolationFraction, liveWeight, profileForWeightMode, usesManualBallast, validWeightAnchors, weightModeForProfile, type WeightMode } from '../core/weight';
 import { initialBallast, type BallastState } from '../core/ballast';
 import { selectProfileId } from '../core/select';
@@ -301,6 +301,7 @@ export class App {
       if (s.iasKt !== null) this.smoothIas = smoothStep(this.smoothIas, s.iasKt, dt, tau);
       else this.smoothIas = null;
       if (s.aglFt !== null && isFinite(s.aglFt)) {
+        if (dt > STALE_MS) this.aglAverage.reset();
         this.aglAverage.add(now, s.aglFt);
         this.avgAgl = this.aglAverage.value(now);
         this.smoothAgl = this.avgAgl === null ? null : smoothStep(this.smoothAgl, this.avgAgl, dt, tau);

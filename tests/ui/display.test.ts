@@ -207,6 +207,20 @@ describe('states and the current-flap fallback chain (simulated feed)', () => {
     await page.close();
   });
 
+  it('a fresh AGL after a stale gap is shown straight away, not averaged with the old height', async () => {
+    const page = await env.newPage('?seed=demo');
+    await load(page, makeProfile(6));
+    await sim(page, { connected: true, inFlight: true, onGround: false, fault: 'none', aglFt: 600 });
+    await settle(page, 1300);
+    expect(await text(page, '.fh-display .fh-aglread')).toBe('600 ft');
+    await sim(page, { fault: 'stale' });
+    await page.waitForTimeout(2000);
+    expect(await text(page, '.fh-display .fh-status')).toContain('No data');
+    await sim(page, { fault: 'none', aglFt: 200 });
+    expect(await text(page, '.fh-display .fh-aglread')).toBe('200 ft');
+    await page.close();
+  });
+
   it('shows Waiting, No data, Paused, LOW and FAST states', async () => {
     const page = await env.newPage('?seed=demo');
     await load(page, makeProfile(6));
