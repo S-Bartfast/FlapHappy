@@ -60,6 +60,42 @@ async function clickBallast(panel: Page, fraction: number) {
 }
 
 describe.skipIf(!canRun)('visible control window and optional external panel', () => {
+  it('forwards simple preference from the main Settings session to both live panels and restart', async()=>{
+    const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-simple-session-'));
+    const fixture=makeProfile(3,{id:'simple-fixture'});
+
+    fs.mkdirSync(path.join(ud,'profiles'));fs.writeFileSync(path.join(ud,'profiles',fixture.id+'.json'),exportProfileJson(fixture));
+    fs.writeFileSync(path.join(ud,'settings.json'),JSON.stringify({schema:'flaphappy.settings/1',last_profile_id:fixture.id,active_by_title:{'Simulated glider':fixture.id}}));
+    let session=await launch(ud);let browser:import('playwright-core').Browser|undefined;
+    try{
+      let {app,page}=session;
+      let external=await openExternal(app,page);
+      const {chromium}=await import('playwright-core');const {chromePath}=await import('./browser-env');
+      browser=await chromium.launch({executablePath:chromePath(),args:['--no-sandbox']});const cockpit=await browser.newPage();await cockpit.goto(panelUrl+'/panel.html');
+      const sim=async(patch:Record<string,unknown>)=>page.evaluate(value=>{const sim=(window as any).__flapHappy.sim;Object.assign(sim.controls,value);sim.tick(0);},patch);
+      await sim({flapCount:3,flapIndex:1,totalWeightKg:400,iasKt:55});
+      const hosts=[external,cockpit];
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-cell.current')!==null);
+      expect((await getFeed()).simpleFlap).toBe(false);
+      await page.click('.fh-main-settings');await page.waitForSelector('.fh-simple-flap');
+      await page.locator('.fh-show-transitions').locator('..').click();
+      await page.locator('.fh-simple-flap').locator('..').click();
+      expect(await page.locator('.fh-show-transitions').isDisabled()).toBe(true);expect(await page.locator('.fh-show-transitions').isChecked()).toBe(true);
+      await waitUntil(async()=> (await getFeed()).simpleFlap===true,'simple preference');
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector<HTMLElement>('.fh-simple-actual')?.textContent==='2'&&document.querySelectorAll('.fh-simple-arrow.on').length===0);
+      await sim({iasKt:75});
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-simple-arrow.on.faster')!==null&&Array.from(document.querySelectorAll<HTMLElement>('.fh-simple-pill')).some(e=>e.offsetHeight>0&&e.textContent==='3'));
+      await sim({iasKt:0});
+      for(const host of hosts)await host.waitForFunction(()=>document.querySelector('.fh-simple-arrow.on.slower')!==null);
+      await page.locator('.fh-simple-flap').locator('..').click();expect(await page.locator('.fh-show-transitions').isEnabled()).toBe(true);expect(await page.locator('.fh-show-transitions').isChecked()).toBe(true);
+      await page.locator('.fh-simple-flap').locator('..').click();
+      await page.click('.fh-main-settings');
+      await app.close();session=await launch(ud);({app,page}=session);
+      expect((await getFeed()).simpleFlap).toBe(true);
+      await page.click('.fh-main-settings');expect(await page.locator('.fh-simple-flap').isChecked()).toBe(true);
+    }finally{await browser?.close();await session.app.close().catch(()=>{});fs.rmSync(ud,{recursive:true,force:true});}
+  });
+
   it('persists Auto-hide preference across restart and publishes it without hiding the external panel', async()=>{
     const ud=fs.mkdtempSync(path.join(os.tmpdir(),'flaphappy-auto-hide-'));let session=await launch(ud);
     try {

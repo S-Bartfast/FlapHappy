@@ -12,7 +12,7 @@ export function defaultSettings(): Settings {
     weight_unit: 'kg',
     height: 'ft',
     agl: defaultAglScale(),
-    ui: { compact: true, always_on_top: false, opacity: 1, zoom: 1, demo_mode: false, external_panel_on_launch: false, show_ballast: true, show_agl: true, auto_hide_external: false, show_transitions: false, show_wind: true, bar_shading: true },
+    ui: { compact: true, always_on_top: false, opacity: 1, zoom: 1, demo_mode: false, external_panel_on_launch: false, show_ballast: true, show_agl: true, simple_flap: false, auto_hide_external: false, show_transitions: false, show_wind: true, bar_shading: true },
     window: null,
     main_window: null,
   };
@@ -72,6 +72,7 @@ export function normalizeSettings(raw: unknown): Settings {
       external_panel_on_launch: ui.external_panel_on_launch === true,
       show_ballast: ui.show_ballast !== false,
       show_agl: ui.show_agl !== false,
+      simple_flap: ui.simple_flap === true,
       auto_hide_external: ui.auto_hide_external === true,
       show_transitions: ui.show_transitions === true,
       show_wind: ui.show_wind !== false,
