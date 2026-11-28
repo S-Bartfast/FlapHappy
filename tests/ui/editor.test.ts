@@ -66,6 +66,9 @@ describe('settings editor: build the AS 33 Me table from scratch', () => {
     await fill(page, 'weight_kg.heavy', '600');
     await fill(page, 'vs_min.no_ballast_kt', '48');
     await fill(page, 'vs_min.max_ballast_kt', '56');
+    // Added rows start with their dividers hidden.
+    expect(await page.locator('.fh-settings .fh-trow.fh-transition-hidden').count()).toBe(5);
+    for (const toggle of await page.locator('.fh-settings .fh-transition-toggle').all()) await toggle.click();
     const no = [62, 74, 86, 100, 118];
     const mx = [70, 83, 97, 113, 133];
     for (let k = 0; k < 5; k++) {
@@ -118,8 +121,10 @@ describe('settings editor: row rules, validation, undo', () => {
     expect([await rowCount(page), await transCount(page)]).toEqual([3, 2]);
     await page.click('.fh-settings .fh-addrow');
     expect([await rowCount(page), await transCount(page)]).toEqual([4, 3]);
-    // A prefilled transition is shown amber until edited.
-    expect(await page.$$eval('.fh-settings .fh-trow.prefilled', (e) => e.length)).toBe(1);
+    // The new row is added at the bottom, with its divider hidden.
+    expect(await page.locator('.fh-settings .fh-lbl[data-path^="flaps"]').last().getAttribute('data-path')).toBe('flaps[0].label');
+    expect(await page.locator('.fh-settings .fh-trow').last().getAttribute('class')).toContain('fh-transition-hidden');
+    expect(await page.$$eval('.fh-settings .fh-trow.fh-transition-hidden', (e) => e.length)).toBe(1);
     const labelsBefore = await page.$$eval('.fh-settings .fh-lbl[data-path^="flaps"]', (e) => e.map((x) => (x as HTMLInputElement).value));
     await page.locator('.fh-settings .fh-frow').nth(1).locator('.fh-remove').click();
     expect([await rowCount(page), await transCount(page)]).toEqual([3, 2]);

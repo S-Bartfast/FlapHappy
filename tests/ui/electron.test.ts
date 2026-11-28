@@ -399,6 +399,7 @@ describe.skipIf(!canRun)('visible control window and optional external panel', (
       for (let i=0;i<6;i++) await page.fill(`.fh-settings [data-path="flaps[${i}].label"]`,labels[i]);
       await page.fill('.fh-settings [data-path="vs_min.no_ballast_kt"]','48');
       await page.fill('.fh-settings [data-path="vs_min.max_ballast_kt"]','56');
+      for (const toggle of await page.locator('.fh-settings .fh-transition-toggle').all()) await toggle.click();
       const no=[62,74,86,100,118], mx=[70,83,97,113,133];
       for(let k=0;k<5;k++) {
         await page.fill(`.fh-settings [data-path="transitions[${k}].no_ballast_kt"]`,String(no[k]));

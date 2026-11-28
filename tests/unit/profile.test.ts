@@ -122,17 +122,19 @@ describe('row editing keeps N-1 transitions', () => {
     expect(r.profile.transitions[0]).toEqual(p.transitions[0]);
   });
 
-  it('add row prefills the midpoint of Vs and the first transition', () => {
+  it('add row goes at the slow end with its divider hidden and blank', () => {
     const p = makeProfile(2);
     const r = addRow(p);
-    expect(r.prefilled).toBe(0);
-    expect(r.profile.transitions[0]).toEqual({ no_ballast_kt: 46, max_ballast_kt: 58 });
+    expect(r.prefilled).toBeNull();
+    expect(r.profile.flaps.slice(1)).toEqual(p.flaps);
+    expect(r.profile.transitions[0]).toEqual({ no_ballast_kt: null, max_ballast_kt: null, exclude_from_display: true });
     expect(r.profile.transitions[1]).toEqual(p.transitions[0]);
+    expect(addRow(createBlankProfile()).profile.transitions).toEqual([]);
   });
 
   it('one row: new transition is the midpoint of Vs and Vne', () => {
     const p = makeProfile(1); // vs 40/50, vne 66
-    const r = addRow(p);
+    const r = insertRowAfter(p, 0);
     expect(r.profile.transitions).toEqual([{ no_ballast_kt: 53, max_ballast_kt: 58 }]);
   });
 

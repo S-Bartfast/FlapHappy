@@ -320,9 +320,11 @@ export function insertRowAt(p: Profile, pos: number, row?: FlapPosition): EditRe
   return { profile: out, prefilled: t };
 }
 
+/** Add a row at the slow end (existing rows keep their sim handle indexes), with its divider hidden and blank. */
 export function addRow(p: Profile, row?: FlapPosition): EditResult {
-  // Grow at the slow end so existing rows keep their sim handle indexes.
-  return insertRowAt(p, 0, row);
+  const r = insertRowAt(p, 0, row);
+  if (r.prefilled !== null) r.profile.transitions[r.prefilled] = { no_ballast_kt: null, max_ballast_kt: null, exclude_from_display: true };
+  return { profile: r.profile, prefilled: null };
 }
 
 export function insertRowAfter(p: Profile, i: number, row?: FlapPosition): EditResult {
