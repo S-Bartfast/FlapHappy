@@ -31,6 +31,9 @@ describe('ballast interpolation', () => {
     const q = makeProfile(3);
     q.transitions[1].no_ballast_kt = 10;
     expect(effectiveBoundaries(q, 0)).toBeNull();
+    const invalidStall = makeProfile(3);
+    invalidStall.vs_min.no_ballast_kt = NaN;
+    expect(effectiveBoundaries(invalidStall, 0)).toBeNull();
   });
 });
 

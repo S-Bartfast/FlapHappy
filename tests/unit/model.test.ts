@@ -361,3 +361,17 @@ it('keeps the scale visible without stall IAS but never emits LOW from its estim
  p.vs_min={no_ballast_kt:40,max_ballast_kt:50};expect(model(p,sample({iasKt:30,flapCount:4})).alert).toBe('LOW');
  expect(model(p,sample({iasKt:30,flapCount:4,flapIndex:2}),0,'live',60).simple.suggestion).toEqual({label:'1',direction:'slower'});
 });
+
+it('estimates the visual floor using shown dividers and recommends the slowest physical group', () => {
+  const p = makeProfile(4);
+  p.vs_min = { no_ballast_kt: null, max_ballast_kt: null };
+  p.transitions[0] = { no_ballast_kt: null, max_ballast_kt: null, exclude_from_display: true };
+  expect(validateProfile(p).ok).toBe(true);
+  expect(effectiveBoundaries(p, 0)).toEqual([52, 64, 76, 114]);
+  const below = model(p, sample({ iasKt: 19, flapCount: 4, flapIndex: 2 }), 0, 'live', 60);
+  expect(below.cells.map(cell => cell.label)).toEqual(['2', '3', '4']);
+  expect(below.simple).toEqual({ current: '3', suggestion: { label: '2', direction: 'slower' } });
+  expect(below.alert).toBeNull();
+  p.transitions[1].exclude_from_display = true;
+  expect(effectiveBoundaries(p, 0)).toEqual([0, 76, 114]);
+});

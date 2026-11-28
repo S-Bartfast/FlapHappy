@@ -171,6 +171,11 @@ Settings → Window and app → In-sim panel: choose the detected MSFS 2024 Comm
 
 Enable installs the verified bundled panel, disabling removes a verified physical install. An installed older package exposes Update and a Settings badge. Equal or newer versions are not overwritten. This is a bundled-version check, not a desktop release checker. Close MSFS before making changes. A custom package may be linked by MSFS Addons Linker; Flap Happy never creates or removes those links. Unlink before removing. Changing destination does not move the existing package; remove/unlink the old installation explicitly first. If a target is unfamiliar, damaged, duplicated or linked to another package, the app refuses to overwrite it. Updates stage on the destination volume outside Community and roll back on a failed swap.
 
+### Merged flap bands
+In Settings, each transition has a **Show divider** switch. On displays its Light / None and Heavy / Max speed inputs; Off hides them, greys the transition row and merges the adjacent bands. Stored speed values are retained and restored when the divider is shown again. Consecutive exclusions form a single band. The actual simulator handle and its exact label are preserved, and excluded speeds are not required until their divider is shown again. The existing profile format and default behavior are unchanged.
+
+**Group hidden flap labels** (Display, off by default) controls the label text for adjacent flap detents with a hidden divider. Off displays the surviving last label (e.g. `5`); On displays all labels (e.g. `L-6-5`). Divider positions, exact handle mapping and recommendation groups remain the same. The setting is shared by the desktop and in-sim display.
+
 ### Optional stall IAS
 
-Existing stall IAS remains authoritative when supplied. Leave both stall inputs blank to use an inferred display-only lower edge: one median gap below the first transition, clamped at zero, or zero with fewer than two transitions. This edge is not a stall speed and does not generate a LOW warning. Existing native Vne and profile file formats are unchanged.
+Existing stall IAS remains authoritative when supplied. Leave both stall inputs blank to use an inferred display-only lower edge: one median gap below the first shown transition, clamped at zero, or zero with fewer than two shown transitions. This edge is not a stall speed and does not generate a LOW warning. Existing native Vne and profile file formats are unchanged.

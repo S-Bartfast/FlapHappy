@@ -19,14 +19,14 @@ export function visualLowerBound(triggers:readonly number[]):number {
 }
 
 /**
- * Boundary speeds `[Vs, T1..T(N-1), Vne]` (length N + 1) at ballast fraction f, or null when any
- * value is missing or the sequence is not strictly ascending. N = 0 gives `[Vs, Vne]` when both are set.
+ * A stall IAS or display-only lower edge, the shown transition speeds, and Vne at fraction f.
+ * Returns null if a required speed is missing or the sequence is not strictly ascending.
  */
 export function effectiveBoundaries(p: Profile, f: number): number[] | null {
   const n = p.flaps.length;
   if (p.transitions.length !== Math.max(n - 1, 0)) return null;
   const specs: Speed[] = [];
-  for (let k = 0; k < n - 1; k++) specs.push(p.transitions[k]);
+  for (let k = 0; k < n - 1; k++) if (!p.transitions[k].exclude_from_display) specs.push(p.transitions[k]);
   specs.push({ no_ballast_kt: p.vne, max_ballast_kt: null });
   const out: number[] = [];
   for (const s of specs) {
@@ -34,11 +34,23 @@ export function effectiveBoundaries(p: Profile, f: number): number[] | null {
     if (v === null || !isFinite(v)) return null;
     out.push(v);
   }
-  const stall=effectiveSpeed(p.vs_min,f);
-  if(stall===null&&p.vs_min.max_ballast_kt!==null)return null;
-  out.unshift(stall??visualLowerBound(out.slice(0,-1)));
+  const stall = effectiveSpeed(p.vs_min, f);
+  if (stall === null && p.vs_min.max_ballast_kt !== null) return null;
+  if (stall !== null && !isFinite(stall)) return null;
+  out.unshift(stall ?? visualLowerBound(out.slice(0, -1)));
   for (let i = 1; i < out.length; i++) if (out[i] <= out[i - 1]) return null;
   return out;
+}
+
+/** Consecutive physical flap rows share a display band when their separating
+ * transition is excluded. The simulator mapping is never changed. */
+export function flapGroups(p:Profile): { labels:string[]; members:number[][] } {
+  const members:number[][]=[];
+  p.flaps.forEach((_row,i)=>{
+    if(i===0||!p.transitions[i-1]?.exclude_from_display)members.push([]);
+    members[members.length-1].push(i);
+  });
+  return {members,labels:members.map(group=>group.map(i=>p.flaps[i].label).join('-'))};
 }
 
 /** Number of bar columns: one per flap, or a single unsegmented column for N = 0. */
