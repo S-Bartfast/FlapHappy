@@ -231,7 +231,7 @@ button, input, select { font-family: inherit; font-size: 14px; }
 .fh-devrow > * { margin-right: 8px; margin-top: 2px; margin-bottom: 2px; }
 .fh-devlab { color: #b8a77a; }
 .fh-dev-ias, .fh-dev-aglrange { width: 260px; }
-.fh-dev-iasnum, .fh-dev-count, .fh-dev-agl { width: 72px; }
+.fh-dev-iasnum, .fh-dev-count, .fh-dev-flap, .fh-dev-agl { width: 72px; }
 .fh-dev-title { width: 180px; }
 .fh-devrow .fh-btn { margin-left: 0; padding: 3px 8px; }
 .fh-devstate { color: #b8a77a; }

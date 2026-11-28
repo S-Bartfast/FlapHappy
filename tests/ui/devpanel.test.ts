@@ -16,9 +16,14 @@ describe('dev control panel drives the simulated feed', () => {
     await page.fill('.fh-dev-iasnum', '95');
     await page.waitForTimeout(400);
     expect(await page.$eval('.fh-display .fh-readout', (e) => e.textContent)).toBe('95 kt');
-    await page.selectOption('.fh-dev-flap', '5');
+    await page.fill('.fh-dev-flap', '5');
     await page.waitForTimeout(300);
     expect(await page.$$eval('.fh-display .fh-cell.current', (e) => e.map((x) => x.textContent))).toEqual(['5']);
+    await page.focus('.fh-dev-flap');
+    await page.keyboard.press('ArrowDown');
+    expect(await page.inputValue('.fh-dev-flap')).toBe('4');
+    await page.fill('.fh-dev-flap', '9');
+    expect(await page.inputValue('.fh-dev-flap')).toBe('5');
     await page.click('.fh-fault[data-fault="unreadable"]');
     await page.waitForTimeout(300);
     expect(await page.$eval('.fh-display .fh-badge', (e) => e.textContent)).toBe('FLAP ?');
@@ -56,6 +61,20 @@ describe('dev control panel drives the simulated feed', () => {
     }
     await page.click('.fh-dev-stop');
     expect(seen.size).toBeGreaterThanOrEqual(2);
+    await page.close();
+  });
+
+  it('remembers the control values for the next session', async () => {
+    const page = await env.newPage('?seed=demo', { width: 820, height: 900 });
+    await page.fill('.fh-dev-iasnum', '73');
+    await page.fill('.fh-dev-flap', '2');
+    await page.uncheck('.fh-dev-connected');
+    await page.reload();
+    await page.waitForSelector('.fh-dev-flap');
+    expect(await page.inputValue('.fh-dev-iasnum')).toBe('73');
+    expect(await page.inputValue('.fh-dev-flap')).toBe('2');
+    expect(await page.isChecked('.fh-dev-connected')).toBe(false);
+    expect(await page.$eval('.fh-display .fh-status', (e) => e.textContent)).toContain('Waiting for MSFS...');
     await page.close();
   });
 
